@@ -1,0 +1,15 @@
+# HRS Data Pipeline - Source Configuration
+# Define data sources and their metadata
+
+sources:
+  - name: "example_source"
+    url: "https://example.com/codebook.html"
+    type: "html"
+    year: null
+    description: "Example HTML codebook source"
+  
+  # Add more sources as needed
+  # - name: "another_source"
+  #   url: "https://example.com/codebook.pdf"
+  #   type: "pdf"
+  #   year: 2023
