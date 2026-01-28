@@ -1,82 +1,136 @@
-# HRS Data Pipeline - Source Configuration
-# Define data sources and their metadata
-
-# Proxy configuration (optional)
-# Uncomment and configure proxies to avoid IP-based blocking
-# Format: "http://username:password@host:port" or "http://host:port"
-# 
-# To get free proxies, you can:
-# 1. Run: python -m src.fetch.proxy_utils (to fetch and test free proxies)
-# 2. Use paid proxy services (recommended for production)
-# 3. Set up your own proxy server
-#
-# proxies:
-#   - "http://proxy1.example.com:8080"
-#   - "http://proxy2.example.com:8080"
-#   - "http://user:pass@proxy3.example.com:8080"
-
-# Enable proxy rotation (uses different proxy for each request)
-use_proxy_rotation: true
-
-# Automatically fetch and validate a small set of free proxies if none are configured.
-# Free proxies are unreliable; use paid proxies for production.
-auto_fetch_proxies: true
-
-# Proxy fetch/test tuning (optional).
-# proxy_test_url: "https://hrs.isr.umich.edu/robots.txt"
-# proxy_fetch_limit: 50
-
-# Optional headers applied to all requests (useful for auth/cookies).
-# default_headers:
-#   Cookie: "name=value; name2=value2"
-#   Referer: "https://hrsdata.isr.umich.edu/"
-
-# Optional login (reads credentials from .env or environment variables).
-# auth:
-#   login_url: "https://hrsdata.isr.umich.edu/user/login"
-#   login_post_url: "https://hrsdata.isr.umich.edu/user/login"
-#   email_field: "name"         # or "auto" to detect from form
-#   password_field: "pass"      # or "auto" to detect from form
-#   extra_fields:
-#     form_id: "user_login_form"
-#     form_build_id: "form-abc123"
-
-proxies: []
-
-  
-
 years:
   - 1996
-  - 1997
   - 1998
-  - 1999
   - 2000
-  - 2001
   - 2002
+  - 2004
+  - 2006
+  - 2008
+  - 2010
+  - 2012
+  - 2014
+  - 2016
+  - 2018
+  - 2020
+  - 2022
+
+# URL patterns to try for each source
+patterns:
+  # hrs_urls
+  core_codebook:
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/h{sub_year}pr_ri.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/h{sub_year}pr_hi.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/03_core.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/01_w2mas.htm"
+
+  exit_codebook:
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/exit/codebook/h{sub_year}xpr_ri.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/exit/codebook/x{sub_year}pr_ri.htm"
+  
+  exit_imputations_codebook:
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/x{sub_year}icb.txt"
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}xicb.txt"
+  post_exit_codebook:
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/postexit/codebook/px{sub_year}pr_ti.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/postexit/codebook/px{sub_year}pr_ri.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/postexit/codebook/h{sub_year}pxpr_ri.htm"
+  core_imputations_codebook:
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}icb_0.txt"
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}icb.txt"
+
+  core_industry_occupations_codebook:
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/indoccsupp/codebook/h{sub_year}sup_ri.htm"
+
+  # ahead_urls
+  ahead_core_codebook:
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/a{sub_year}pr_ri.htm"
+    - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/core/codebook/ahintro.htm#conventions"
+  ahead_exit_imputations_codebook:
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/x95icb.txt"
+  ahead_core_imputations_codebook:
+    - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/a{year}icb.txt"
+  
 
 sources:
   - name: "hrs_core_codebook"
-    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}pr_ri.pdf"
-    type: "pdf"
-    year: 1996
-    sub_year: 96
+    type: "html"
+    pattern_group: "core_codebook"
+    years: [1992, 1994, 1996, 1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    starting_year: 1992
+    ending_year: 2022
+    sub_year: 92
     description: "Human Resources Survey (HRS) Core Codebook"
-
+  
   - name: "hrs_exit_codebook"
-    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}ex_ri.pdf"
-    type: "pdf"
-    year: 1996
+    type: "html"
+    pattern_group: "exit_codebook"
+    years: [1996, 1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    starting_year: 1996
+    ending_year: 2022
     sub_year: 96
     description: "Human Resources Survey (HRS) Exit codebook"
 
-  - name: "hrs_core_imputations_codebook"
-    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}icb.txt"
+  - name: "hrs_exit_imputations_codebook"
     type: "txt"
-    year: 1996
+    pattern_group: "exit_imputations_codebook"
+    years: [1996, 1998, 2000]
+    starting_year: 1996
+    ending_year: 2000
+    sub_year: 96
+    description: "Human Resources Survey (HRS) Exit Imputations Codebook"
+
+
+  - name: "hrs_core_imputations_codebook"
+    type: "txt"
+    pattern_group: "core_imputations_codebook"
+    years: [1992, 1994, 1996, 1998, 2000, 2002, 2004]
+    starting_year: 1992
+    ending_year: 2004
+    sub_year: 92
     description: "Human Resources Survey (HRS) Core Imputations Codebook"
 
-  # Add more sources as needed
-  # - name: "another_source"
-  #   url: "https://example.com/codebook.pdf"
-  #   type: "pdf"
-  #   year: 2023
+  - name: "hrs_post_exit_codebook"
+    type: "html"
+    pattern_group: "post_exit_codebook"
+    years: [1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    starting_year: 1998
+    ending_year: 2022
+    sub_year: 98
+    description: "Human Resources Survey (HRS) Post Exit codebook"
+  
+  - name: "hrs_core_industry_occupations_codebook"
+    type: "html"
+    pattern_group: "core_industry_occupations_codebook"
+    years: [2004, 2010]
+    starting_year: 2004
+    ending_year: 2010
+    sub_year: 04
+    description: "Human Resources Survey (HRS) Core Industry Occupations Codebook"
+
+  # ahead_data_section
+  - name: "ahead_core_codebook"
+    type: "html"
+    pattern_group: "ahead_core_codebook"
+    years: [1993, 1995]
+    starting_year: 1993
+    ending_year: 1995
+    sub_year: 93
+    description: "Human Resources Survey (HRS) Ahead Core Codebook"
+  
+  - name: "ahead_core_imputations_codebook"
+    type: "txt"
+    pattern_group: "ahead_core_imputations_codebook"
+    years: [1995]
+    starting_year: 1995
+    ending_year: 1995
+    sub_year: 95
+    description: "Human Resources Survey (HRS) Ahead Core Imputations Codebook"
+
+  - name: "ahead_exit_imputations_codebook"
+    type: "txt"
+    pattern_group: "ahead_exit_imputations_codebook"
+    years: [1995]
+    starting_year: 1995
+    ending_year: 1995
+    sub_year: 95
+    description: "Human Resources Survey (HRS) Ahead Exit Codebook"
