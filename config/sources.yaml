@@ -1,13 +1,80 @@
 # HRS Data Pipeline - Source Configuration
 # Define data sources and their metadata
 
-sources:
-  - name: "example_source"
-    url: "https://example.com/codebook.html"
-    type: "html"
-    year: null
-    description: "Example HTML codebook source"
+# Proxy configuration (optional)
+# Uncomment and configure proxies to avoid IP-based blocking
+# Format: "http://username:password@host:port" or "http://host:port"
+# 
+# To get free proxies, you can:
+# 1. Run: python -m src.fetch.proxy_utils (to fetch and test free proxies)
+# 2. Use paid proxy services (recommended for production)
+# 3. Set up your own proxy server
+#
+# proxies:
+#   - "http://proxy1.example.com:8080"
+#   - "http://proxy2.example.com:8080"
+#   - "http://user:pass@proxy3.example.com:8080"
+
+# Enable proxy rotation (uses different proxy for each request)
+use_proxy_rotation: true
+
+# Automatically fetch and validate a small set of free proxies if none are configured.
+# Free proxies are unreliable; use paid proxies for production.
+auto_fetch_proxies: true
+
+# Proxy fetch/test tuning (optional).
+# proxy_test_url: "https://hrs.isr.umich.edu/robots.txt"
+# proxy_fetch_limit: 50
+
+# Optional headers applied to all requests (useful for auth/cookies).
+# default_headers:
+#   Cookie: "name=value; name2=value2"
+#   Referer: "https://hrsdata.isr.umich.edu/"
+
+# Optional login (reads credentials from .env or environment variables).
+# auth:
+#   login_url: "https://hrsdata.isr.umich.edu/user/login"
+#   login_post_url: "https://hrsdata.isr.umich.edu/user/login"
+#   email_field: "name"         # or "auto" to detect from form
+#   password_field: "pass"      # or "auto" to detect from form
+#   extra_fields:
+#     form_id: "user_login_form"
+#     form_build_id: "form-abc123"
+
+proxies: []
+
   
+
+years:
+  - 1996
+  - 1997
+  - 1998
+  - 1999
+  - 2000
+  - 2001
+  - 2002
+
+sources:
+  - name: "hrs_core_codebook"
+    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}pr_ri.pdf"
+    type: "pdf"
+    year: 1996
+    sub_year: 96
+    description: "Human Resources Survey (HRS) Core Codebook"
+
+  - name: "hrs_exit_codebook"
+    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}ex_ri.pdf"
+    type: "pdf"
+    year: 1996
+    sub_year: 96
+    description: "Human Resources Survey (HRS) Exit codebook"
+
+  - name: "hrs_core_imputations_codebook"
+    url: "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}icb.txt"
+    type: "txt"
+    year: 1996
+    description: "Human Resources Survey (HRS) Core Imputations Codebook"
+
   # Add more sources as needed
   # - name: "another_source"
   #   url: "https://example.com/codebook.pdf"
