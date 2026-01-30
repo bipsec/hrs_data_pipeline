@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Explore the Health and Retirement Study (HRS) codebook data - variables, sections, and metadata">
+    <title>HRS Data Pipeline - Dashboard</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-content">
+            <h1>HRS Data Pipeline Dashboard</h1>
+            <p class="header-subtitle">
+                Health and Retirement Study Codebook Explorer
+            </p>
+            <p class="header-subtitle" style="font-size: 1rem; opacity: 0.85;">
+                University of Michigan | Institute for Social Research
+            </p>
+            
+            <!-- Statistics Dashboard -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-codebooks">-</span>
+                    <span class="stat-label">Codebooks</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-variables">-</span>
+                    <span class="stat-label">Variables</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-sections">-</span>
+                    <span class="stat-label">Sections</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-years">-</span>
+                    <span class="stat-label">Year Range</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Search Bar -->
+            <div class="search-section">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="search-input" 
+                    placeholder="🔍 Search variables by name or description..."
+                    aria-label="Search variables"
+                >
+                <button class="search-button" onclick="searchVariables()">Search</button>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="tabs" role="tablist">
+                <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
+                <button class="tab" data-tab="codebooks" role="tab" aria-selected="false">Codebooks</button>
+                <button class="tab" data-tab="search" role="tab" aria-selected="false">Search Variables</button>
+                <button class="tab" data-tab="sections" role="tab" aria-selected="false">Sections</button>
+            </div>
+
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="content-section active" role="tabpanel">
+                <div class="section-header">
+                    <h2>Overview</h2>
+                    <p class="section-description">View statistics and available data sources</p>
+                </div>
+                
+                <div class="cards-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Available Years</h3>
+                        </div>
+                        <div id="years-list" class="years-grid">
+                            <div class="loading">Loading years...</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Available Sources</h3>
+                        </div>
+                        <div id="sources-list" class="sources-list">
+                            <div class="loading">Loading sources...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Codebooks Section -->
+            <div id="codebooks" class="content-section" role="tabpanel">
+                <div class="section-header">
+                    <h2>Codebooks</h2>
+                    <p class="section-description">Browse available codebooks by year and source</p>
+                </div>
+                
+                <div class="filters">
+                    <select id="codebook-year-filter" class="filter-select">
+                        <option value="">All Years</option>
+                    </select>
+                    <select id="codebook-source-filter" class="filter-select">
+                        <option value="">All Sources</option>
+                    </select>
+                    <button class="btn-primary" onclick="loadCodebooks()">Load Codebooks</button>
+                </div>
+                
+                <div id="codebooks-list" class="cards-grid">
+                    <div class="empty-state">Select filters and click "Load Codebooks" to view data</div>
+                </div>
+            </div>
+
+            <!-- Search Section -->
+            <div id="search" class="content-section" role="tabpanel">
+                <div class="section-header">
+                    <h2>Search Variables</h2>
+                    <p class="section-description">Search for variables by name or description</p>
+                </div>
+                
+                <div class="search-filters">
+                    <select id="search-year-filter" class="filter-select">
+                        <option value="">All Years</option>
+                    </select>
+                    <select id="search-source-filter" class="filter-select">
+                        <option value="">All Sources</option>
+                    </select>
+                </div>
+                
+                <div id="search-results" class="search-results">
+                    <div class="empty-state">Enter a search query in the search bar above and press Enter or click Search</div>
+                </div>
+            </div>
+
+            <!-- Sections Section -->
+            <div id="sections" class="content-section" role="tabpanel">
+                <div class="section-header">
+                    <h2>Sections</h2>
+                    <p class="section-description">View codebook sections by year and source</p>
+                </div>
+                
+                <div class="filters">
+                    <select id="section-year-filter" class="filter-select">
+                        <option value="">Select Year</option>
+                    </select>
+                    <select id="section-source-filter" class="filter-select">
+                        <option value="hrs_core_codebook">hrs_core_codebook</option>
+                    </select>
+                    <button class="btn-primary" onclick="loadSections()">Load Sections</button>
+                </div>
+                
+                <div id="sections-list" class="cards-grid">
+                    <div class="empty-state">Select a year and click "Load Sections" to view data</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Variable Detail Modal -->
+    <div id="variable-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="variable-detail"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
