@@ -4,35 +4,30 @@ A data pipeline for fetching, parsing, and processing Human Resources Survey (HR
 
 ## Project Structure
 
-```bash
-hrs_pipeline/
-  config/
-    sources.yaml              # Data source configuration
-  src/
-    discovery/
-      discover_codebooks.py
-    fetch/
-      http_client.py          # HTTP client for fetching data
-      fetch_sources.py        # Main fetching script
-    parse/
-      parse_html_codebook.py
-      parse_pdf_codebook.py   # optional
-      models.py               # pydantic schemas for parsed entities
-    # normalize/
-    #   canonicalize.py
-    #   concept_mapping.py
-    # db/
-    #   schema.sql
-    #   write_relational.py
-    #   write_embeddings.py     # optional
-    api/
-      app.py                  # FastAPI: /search, /variable/{id}, /years
-  data/
-    raw/                      # Raw fetched data (organized by source name)
-    parsed/
-  scripts/
-    run_discovery.sh
-    run_ingest.sh
+```
+hrs_data_pipeline/
+├── config/
+│   └── sources.yaml              # Data source configuration
+├── src/
+│   ├── discovery/               # Codebook discovery module
+│   ├── fetch/                   # Data fetching module
+│   │   ├── client.py            # HTTP client
+│   │   └── fetch_sources.py     # Main fetching script
+│   ├── parse/                   # Codebook parsing module
+│   │   ├── models.py            # Pydantic data models
+│   │   ├── parse_txt_codebook.py
+│   │   ├── parse_codebooks.py   # Main parsing script
+│   │   └── save_codebook.py     # JSON save utilities
+│   ├── database/                # MongoDB integration
+│   │   ├── mongodb_client.py    # MongoDB connection
+│   │   └── load_codebooks.py    # Data loading script
+│   ├── api/                     # FastAPI application
+│   └── test/                    # Unit tests
+├── data/
+│   ├── raw/                     # Fetched raw codebook files
+│   └── parsed/                  # Structured JSON output
+├── report/                      # Documentation and reports
+└── scripts/                     # Utility scripts
 ```
 
 ## Usage
@@ -46,52 +41,19 @@ The `fetch_sources.py` script fetches data from configured sources defined in `c
 Fetch all sources defined in the configuration file:
 
 ```bash
-# Using Python module
-python -m src.fetch.fetch_sources
 
-# Or using uv
-uv run python -m src.fetch.fetch_sources
+Create a data dir --> Keep HRS data inside the dir --> unzip h{20}cb folder
+
+Create parsed dir inside the data dir to save the processed core_codebook data
+
+data/
+HRS Data/
+    2022/
+      Core/
+        h22cb
+parsed/
 ```
 
-#### Fetch Specific Sources
-
-Fetch only specific data sources by name:
-
-```bash
-# Fetch a single source
-python -m src.fetch.fetch_sources --source hrs_core_codebook
-
-# Fetch multiple sources
-python -m src.fetch.fetch_sources --source hrs_core_codebook --source hrs_exit_codebook
-
-# Using short form
-python -m src.fetch.fetch_sources -s hrs_core_codebook -s hrs_exit_imputations_codebook
-```
-
-#### Custom Configuration and Output
-
-```bash
-# Use a custom configuration file
-python -m src.fetch.fetch_sources --config path/to/custom_sources.yaml
-
-# Specify a custom output directory
-python -m src.fetch.fetch_sources --output-dir data/custom_raw
-
-# Combine options
-python -m src.fetch.fetch_sources \
-  --config config/custom.yaml \
-  --output-dir data/custom \
-  --source hrs_core_codebook \
-  --source hrs_exit_codebook
-```
-
-### Command-Line Options
-
-- `--config`, `-c`: Path to YAML configuration file (default: `config/sources.yaml`)
-- `--output-dir`, `-o`: Output directory for fetched files (default: `data/raw`)
-- `--source`, `-s`: Name of a source to fetch (can be specified multiple times). If omitted, all sources from config will be fetched.
-
-### Available Data Sources
 
 Configured sources include:
 
@@ -105,21 +67,84 @@ Configured sources include:
 - `ahead_core_imputations_codebook` - AHEAD Core Imputations Codebook
 - `ahead_exit_imputations_codebook` - AHEAD Exit Imputations Codebook
 
-### Output Structure
 
-Fetched files are organized by source name in separate directories:
+### Parsing Codebooks
 
+Parse codebook files into structured JSON:
+
+```bash
+# Parse specific year
+python -m src.parse.parse_codebooks --data-dir data --output-dir data/parsed --year 2020
+
+# Parse all years
+python -m src.parse.parse_codebooks --data-dir data --output-dir data/parsed
+
+# Build cross-year catalog
+python -m src.parse.parse_codebooks --build-catalog
 ```
-data/raw/
-  hrs_core_codebook/
-    hrs_core_codebook_1992.html
-    hrs_core_codebook_1994.html
-    ...
-  hrs_exit_codebook/
-    hrs_exit_codebook_1996.html
-    hrs_exit_codebook_1998.html
-    ...
+
+### Loading into MongoDB
+
+Configure the MongoDB Compass locally to store the parsed data.
+
+Load parsed codebooks into MongoDB:
+
+```bash
+# Load all codebooks
+python -m src.database.load_codebooks
+
+# Load specific source
+python -m src.database.load_codebooks --source hrs_core_codebook
+
+# Load specific year
+python -m src.database.load_codebooks --year 2020
+
+# Create indexes for better performance
+python -m src.database.load_codebooks --create-indexes
 ```
+
+**MongoDB Setup:**
+
+1. Create `.env` file in project root:
+```env
+MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
+MONGODB_DATABASE_NAME=hrs_data
+```
+
+2. Start MongoDB (if running locally)
+
+### Running the API
+
+Start the FastAPI server to query the data:
+
+```bash
+# Using uvicorn
+uvicorn src.api.app:app --reload
+
+# Or using the script (Windows)
+scripts\run_api.bat
+
+# Or using the script (Linux/Mac)
+bash scripts/run_api.sh
+```
+
+The API and UI will be available at `http://localhost:8000`
+
+**Access Points:**
+- **Web UI**: http://localhost:8000 (or http://localhost:8000/static/index.html)
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+**Example Endpoints:**
+- `GET /codebooks` - List all codebooks
+- `GET /codebooks/{year}` - Get codebook by year
+- `GET /variables/{variable_name}?year=2020` - Get variable details
+- `GET /search?q=SUBHH` - Search variables
+- `GET /sections?year=2020` - Get sections for a year
+- `GET /years` - Get available years and sources
+- `GET /stats` - Get database statistics
+
+See `src/api/README.md` for complete API documentation.
 
 ### Configuration
 
@@ -128,3 +153,10 @@ Edit `config/sources.yaml` to:
 - Configure URL patterns for each source type
 - Set years to fetch for each source
 - Define source metadata (type, description, etc.)
+
+### Testing
+
+```bash
+uv sync --extra dev
+python.exe -m pytest -q
+```
