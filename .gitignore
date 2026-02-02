@@ -49,4 +49,3 @@ Thumbs.db
 # UV
 .uv/
 .env
-data/*
