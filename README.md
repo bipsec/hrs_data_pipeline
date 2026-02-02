@@ -156,6 +156,12 @@ Edit `config/sources.yaml` to:
 
 ### Testing
 
+
+```bash
+# Run all tests
+python -m pytest src/test/test_pipeline.py -v
+```
+
 ```bash
 uv sync --extra dev
 python.exe -m pytest -q

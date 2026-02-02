@@ -49,3 +49,9 @@ Thumbs.db
 # UV
 .uv/
 .env
+
+data/*
+!data/.gitkeep
+/report/*
+!/report/.gitkeep
+_pycache_/
