@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 from datetime import datetime
 
-from .models import (
+from src.models.cores import (
     Codebook,
     Variable,
     ValueCode,
