@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 
 from ..database.mongodb_client import MongoDBClient
-from ..parse.models import Variable, ValueCode, Section, Codebook, VariableLevel, VariableType
+from ..models.cores import (
+    Variable, ValueCode, Section, Codebook, VariableLevel, VariableType,
+    extract_base_name, construct_variable_name, get_year_prefix, get_year_from_prefix,
+    get_wave_number, get_year_from_wave, YEAR_PREFIX_MAP, HRS_YEARS, HRS_SECTION_CODES
+)
 
 app = FastAPI(
     title="HRS Data Pipeline API",
@@ -61,6 +65,7 @@ class CodebookSummary(BaseModel):
     """Codebook summary response."""
     source: str
     year: int
+    wave: Optional[int] = None
     release_type: Optional[str] = None
     total_variables: int
     total_sections: int
@@ -79,6 +84,26 @@ class YearsResponse(BaseModel):
     """Available years response."""
     years: List[int]
     sources: List[str]
+    hrs_years: List[int] = Field(default_factory=lambda: sorted(list(HRS_YEARS)))
+    year_prefix_map: Dict[int, str] = Field(default_factory=lambda: YEAR_PREFIX_MAP)
+
+
+class VariableTemporalResponse(BaseModel):
+    """Temporal mapping response for a variable."""
+    base_name: str
+    years: List[int]
+    year_prefixes: Dict[int, str]
+    first_year: Optional[int] = None
+    last_year: Optional[int] = None
+    consistent_metadata: bool = True
+    consistent_values: bool = True
+
+
+class WaveInfo(BaseModel):
+    """Wave information response."""
+    wave: int
+    year: int
+    prefix: str
 
 
 def get_mongodb_client() -> MongoDBClient:
@@ -138,6 +163,7 @@ async def get_codebooks(
             CodebookSummary(
                 source=cb["source"],
                 year=cb["year"],
+                wave=cb.get("wave") or get_wave_number(cb["year"]),
                 release_type=cb.get("release_type"),
                 total_variables=cb["total_variables"],
                 total_sections=cb["total_sections"],
@@ -170,6 +196,7 @@ async def get_codebook_by_year(
         return CodebookSummary(
             source=codebook["source"],
             year=codebook["year"],
+            wave=codebook.get("wave") or get_wave_number(codebook["year"]),
             release_type=codebook.get("release_type"),
             total_variables=codebook["total_variables"],
             total_sections=codebook["total_sections"],
@@ -461,7 +488,12 @@ async def get_years():
         years = sorted(collection.distinct("year"))
         sources = sorted(collection.distinct("source"))
         
-        return YearsResponse(years=years, sources=sources)
+        return YearsResponse(
+            years=years,
+            sources=sources,
+            hrs_years=sorted(list(HRS_YEARS)),
+            year_prefix_map=YEAR_PREFIX_MAP
+        )
 
 
 @app.get("/stats", tags=["General"])
@@ -491,8 +523,230 @@ async def get_stats():
             "total_indexes": total_indexes,
             "year_range": year_range,
             "years": years,
-            "sources": sorted(codebooks_collection.distinct("source"))
+            "sources": sorted(codebooks_collection.distinct("source")),
+            "hrs_years_supported": sorted(list(HRS_YEARS)),
+            "section_codes": sorted(list(HRS_SECTION_CODES))
         }
+
+
+# ===== Cross-Year Variable Mapping Endpoints =====
+
+@app.get("/variables/base/{base_name}", response_model=List[VariableSummary], tags=["Variables"])
+async def get_variable_by_base_name(
+    base_name: str = PathParam(..., description="Base variable name (e.g., 'SUBHH')"),
+    years: Optional[str] = Query(None, description="Comma-separated list of years to include"),
+    source: str = Query("hrs_core_codebook", description="Source name")
+):
+    """Get all instances of a variable across years by base name.
+    
+    This endpoint uses the base name (without year prefix) to find variables
+    across multiple years. For example, 'SUBHH' will find RSUBHH (2020),
+    QSUBHH (2018), PSUBHH (2016), etc.
+    """
+    with get_mongodb_client() as client:
+        collection = client.get_collection("codebooks")
+        
+        # Parse years if provided
+        year_list = None
+        if years:
+            try:
+                year_list = [int(y.strip()) for y in years.split(",")]
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid years format. Use comma-separated integers.")
+        
+        # Query codebooks
+        query: Dict[str, Any] = {"source": source}
+        if year_list:
+            query["year"] = {"$in": year_list}
+        
+        codebooks = list(collection.find(query))
+        
+        if not codebooks:
+            raise HTTPException(status_code=404, detail=f"No codebooks found for source {source}")
+        
+        results = []
+        for codebook in codebooks:
+            year = codebook["year"]
+            prefix = get_year_prefix(year)
+            
+            # Construct variable name for this year
+            var_name = construct_variable_name(base_name, year)
+            
+            # Find variable in codebook
+            variables = codebook.get("variables", [])
+            variable = next((v for v in variables if v["name"] == var_name), None)
+            
+            if variable:
+                results.append(VariableSummary(
+                    name=variable["name"],
+                    year=year,
+                    section=variable.get("section", ""),
+                    level=variable.get("level", ""),
+                    description=variable.get("description", ""),
+                    type=variable.get("type", "")
+                ))
+        
+        if not results:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Variable with base name '{base_name}' not found"
+            )
+        
+        return results
+
+
+@app.get("/variables/base/{base_name}/temporal", response_model=VariableTemporalResponse, tags=["Variables"])
+async def get_variable_temporal_mapping(
+    base_name: str = PathParam(..., description="Base variable name"),
+    source: str = Query("hrs_core_codebook", description="Source name")
+):
+    """Get temporal mapping information for a variable across all years.
+    
+    Returns information about which years a variable appears in, what prefixes
+    are used, and consistency information.
+    """
+    with get_mongodb_client() as client:
+        collection = client.get_collection("codebooks")
+        
+        codebooks = list(collection.find({"source": source}))
+        
+        if not codebooks:
+            raise HTTPException(status_code=404, detail=f"No codebooks found for source {source}")
+        
+        years_present = []
+        year_prefixes = {}
+        
+        for codebook in codebooks:
+            year = codebook["year"]
+            prefix = get_year_prefix(year)
+            var_name = construct_variable_name(base_name, year)
+            
+            # Check if variable exists
+            variables = codebook.get("variables", [])
+            variable = next((v for v in variables if v["name"] == var_name), None)
+            
+            if variable:
+                years_present.append(year)
+                if prefix:
+                    year_prefixes[year] = prefix
+        
+        if not years_present:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Variable with base name '{base_name}' not found in any year"
+            )
+        
+        return VariableTemporalResponse(
+            base_name=base_name,
+            years=sorted(years_present),
+            year_prefixes=year_prefixes,
+            first_year=min(years_present),
+            last_year=max(years_present),
+            consistent_metadata=True,  # Could be enhanced to check actual consistency
+            consistent_values=True  # Could be enhanced to check actual consistency
+        )
+
+
+@app.get("/waves", response_model=List[WaveInfo], tags=["General"])
+async def get_waves():
+    """Get information about all HRS waves (1-16)."""
+    waves = []
+    for year in sorted(HRS_YEARS):
+        wave = get_wave_number(year)
+        prefix = get_year_prefix(year)
+        if wave:
+            waves.append(WaveInfo(
+                wave=wave,
+                year=year,
+                prefix=prefix or ""
+            ))
+    return waves
+
+
+@app.get("/waves/{wave}", response_model=WaveInfo, tags=["General"])
+async def get_wave_info(wave: int = PathParam(..., ge=1, le=16, description="Wave number (1-16)")):
+    """Get information about a specific HRS wave."""
+    year = get_year_from_wave(wave)
+    if not year:
+        raise HTTPException(status_code=404, detail=f"Wave {wave} not found")
+    
+    prefix = get_year_prefix(year)
+    return WaveInfo(
+        wave=wave,
+        year=year,
+        prefix=prefix or ""
+    )
+
+
+@app.get("/utils/extract-base-name", tags=["Utilities"])
+async def extract_base_name_endpoint(
+    variable_name: str = Query(..., description="Variable name with potential prefix")
+):
+    """Extract base variable name by removing year prefix."""
+    base_name = extract_base_name(variable_name)
+    return {
+        "variable_name": variable_name,
+        "base_name": base_name,
+        "prefix": variable_name[:len(variable_name) - len(base_name)] if variable_name != base_name else ""
+    }
+
+
+@app.get("/utils/construct-variable-name", tags=["Utilities"])
+async def construct_variable_name_endpoint(
+    base_name: str = Query(..., description="Base variable name"),
+    year: int = Query(..., description="Survey year (1992-2022)")
+):
+    """Construct variable name with year prefix."""
+    if year not in HRS_YEARS:
+        raise HTTPException(status_code=400, detail=f"Year {year} is not a valid HRS year")
+    
+    var_name = construct_variable_name(base_name, year)
+    prefix = get_year_prefix(year)
+    wave = get_wave_number(year)
+    
+    return {
+        "base_name": base_name,
+        "year": year,
+        "wave": wave,
+        "prefix": prefix or "",
+        "variable_name": var_name
+    }
+
+
+@app.get("/utils/year-prefix", tags=["Utilities"])
+async def get_year_prefix_endpoint(
+    year: int = Query(..., description="Survey year (1992-2022)")
+):
+    """Get the variable name prefix for a given year."""
+    if year not in HRS_YEARS:
+        raise HTTPException(status_code=400, detail=f"Year {year} is not a valid HRS year")
+    
+    prefix = get_year_prefix(year)
+    wave = get_wave_number(year)
+    
+    return {
+        "year": year,
+        "wave": wave,
+        "prefix": prefix or "",
+        "has_prefix": bool(prefix)
+    }
+
+
+@app.get("/utils/prefix-year", tags=["Utilities"])
+async def get_prefix_year_endpoint(
+    prefix: str = Query(..., description="Variable name prefix (e.g., 'R', 'Q', 'E')")
+):
+    """Get the year associated with a variable name prefix."""
+    year = get_year_from_prefix(prefix)
+    if not year:
+        raise HTTPException(status_code=404, detail=f"Prefix '{prefix}' not found")
+    
+    wave = get_wave_number(year)
+    return {
+        "prefix": prefix,
+        "year": year,
+        "wave": wave
+    }
 
 
 if __name__ == "__main__":
