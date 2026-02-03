@@ -166,3 +166,27 @@ python -m pytest src/test/test_pipeline.py -v
 uv sync --extra dev
 python.exe -m pytest -q
 ```
+
+### API ENDPOINTS
+```bash
+# Get SUBHH variable across all years
+GET /variables/base/SUBHH
+
+# Get SUBHH variable for specific years
+GET /variables/base/SUBHH?years=2016,2018,2020
+
+# Get temporal mapping for SUBHH
+GET /variables/base/SUBHH/temporal
+
+# Get wave information
+GET /waves/15  # Returns wave 15 (2020)
+
+# Extract base name
+GET /utils/extract-base-name?variable_name=RSUBHH
+# Returns: {"variable_name": "RSUBHH", "base_name": "SUBHH", "prefix": "R"}
+
+# Construct variable name
+GET /utils/construct-variable-name?base_name=SUBHH&year=2020
+# Returns: {"base_name": "SUBHH", "year": 2020, "wave": 15, "prefix": "R", "variable_name": "RSUBHH"}
+
+```
