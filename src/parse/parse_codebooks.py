@@ -7,7 +7,14 @@ from typing import List, Optional
 
 from .parse_txt_codebook import parse_txt_codebook
 from .save_codebook import save_codebook_json, save_cross_year_catalog
-from .models import CrossYearVariableCatalog, VariableTemporalMapping
+from src.models.cores import (
+    CrossYearVariableCatalog, 
+    VariableTemporalMapping,
+    extract_base_name,
+    get_year_prefix,
+    YEAR_PREFIX_MAP,
+    HRS_YEARS,
+)
 
 
 def find_codebook_files(data_dir: Path, year: Optional[int] = None) -> List[Path]:
@@ -50,7 +57,7 @@ def find_codebook_files(data_dir: Path, year: Optional[int] = None) -> List[Path
 
 
 def build_cross_year_catalog(codebooks: List[dict]) -> CrossYearVariableCatalog:
-    """Build cross-year variable catalog from parsed codebooks."""
+    """Build cross-year variable catalog from parsed codebooks (1992-2022)."""
     catalog = CrossYearVariableCatalog()
     
     # Add codebooks
@@ -62,8 +69,8 @@ def build_cross_year_catalog(codebooks: List[dict]) -> CrossYearVariableCatalog:
         
         # Build temporal mappings
         for var in codebook.variables:
-            # Extract base name (remove year prefix like R, Q, P)
-            base_name = _extract_base_name(var.name)
+            # Extract base name (remove year prefix like R, Q, P, E, etc.)
+            base_name = extract_base_name(var.name)
             
             if base_name not in catalog.base_variables:
                 catalog.base_variables[base_name] = VariableTemporalMapping(
@@ -74,33 +81,33 @@ def build_cross_year_catalog(codebooks: List[dict]) -> CrossYearVariableCatalog:
             mapping = catalog.base_variables[base_name]
             mapping.years.add(year)
             
-            # Extract prefix
-            prefix = var.name[: len(var.name) - len(base_name)] if var.name != base_name else ""
-            if prefix:
+            # Extract prefix using the year prefix map
+            prefix = get_year_prefix(year)
+            if prefix and var.name.startswith(prefix):
                 mapping.year_prefixes[year] = prefix
+            elif var.name != base_name:
+                # Fallback: extract prefix manually
+                prefix = var.name[: len(var.name) - len(base_name)] if var.name != base_name else ""
+                if prefix:
+                    mapping.year_prefixes[year] = prefix
+            
+            # Update first/last year
+            if mapping.first_year is None or year < mapping.first_year:
+                mapping.first_year = year
+            if mapping.last_year is None or year > mapping.last_year:
+                mapping.last_year = year
+    
+    # Calculate year gaps for each variable
+    for mapping in catalog.base_variables.values():
+        if len(mapping.years) > 1:
+            sorted_years = sorted(mapping.years)
+            gaps = []
+            for i in range(len(sorted_years) - 1):
+                if sorted_years[i + 1] - sorted_years[i] > 2:  # More than 2 years apart (biennial)
+                    gaps.append((sorted_years[i] + 2, sorted_years[i + 1] - 2))
+            mapping.year_gaps = gaps
     
     return catalog
-
-
-def _extract_base_name(var_name: str) -> str:
-    """Extract base variable name by removing year prefixes.
-    
-    Examples:
-        RSUBHH -> SUBHH
-        QSUBHH -> SUBHH
-        HHID -> HHID (no prefix)
-    """
-    # Common prefixes (single letter year codes)
-    prefixes = ["R", "Q", "P", "O", "N", "M", "L", "K", "J", "I", "H", "G", "F", "E", "D", "C", "B", "A"]
-    
-    for prefix in prefixes:
-        if var_name.startswith(prefix) and len(var_name) > len(prefix):
-            # Check if rest looks like a variable name
-            rest = var_name[len(prefix) :]
-            if rest and (rest[0].isupper() or rest[0].isdigit()):
-                return rest
-    
-    return var_name
 
 
 def main():

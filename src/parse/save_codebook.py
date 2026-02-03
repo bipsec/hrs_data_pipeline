@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-from .models import Codebook, CrossYearVariableCatalog, VariableTemporalMapping
+from src.models.cores import Codebook, CrossYearVariableCatalog, VariableTemporalMapping
 
 
 def save_codebook_json(
