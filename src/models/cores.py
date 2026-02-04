@@ -40,6 +40,14 @@ from typing import Optional, List, Dict, Set, Any, Tuple
 from datetime import datetime
 from enum import Enum
 
+# Core data periods: 1996-2004 does not follow the same naming/structure as 2008-2022.
+# Legacy = 1992-2004 (different conventions); Modern = 2006-2022 (standardized).
+class CoreDataPeriod(str, Enum):
+    """Core HRS data period. Legacy (1992-2004) uses different conventions than Modern (2008-2022)."""
+    LEGACY = "legacy"   # 1992, 1994, 1996, 1998, 2000, 2002, 2004
+    MODERN = "modern"   # 2006, 2008, 2010, ..., 2022
+
+
 # Year-to-prefix mapping for HRS core data (1992-2022)
 # This maps survey years to the letter prefix used in variable names
 YEAR_PREFIX_MAP: Dict[int, str] = {
@@ -63,14 +71,37 @@ YEAR_PREFIX_MAP: Dict[int, str] = {
     2022: "S",     # Wave 16
 }
 
-# Reverse mapping: prefix to year
+# Legacy core years (1992-2004): different file/naming conventions than modern
+HRS_LEGACY_YEARS: Set[int] = {1992, 1994, 1996, 1998, 2000, 2002, 2004}
+
+# Modern core years (2006-2022): standardized naming and structure
+HRS_MODERN_YEARS: Set[int] = {2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022}
+
+# Period-specific prefix maps (subset of YEAR_PREFIX_MAP)
+YEAR_PREFIX_MAP_LEGACY: Dict[int, str] = {y: YEAR_PREFIX_MAP[y] for y in sorted(HRS_LEGACY_YEARS)}
+YEAR_PREFIX_MAP_MODERN: Dict[int, str] = {y: YEAR_PREFIX_MAP[y] for y in sorted(HRS_MODERN_YEARS)}
+
+# Reverse mapping: prefix to year (global and per-period)
 PREFIX_YEAR_MAP: Dict[str, int] = {v: k for k, v in YEAR_PREFIX_MAP.items() if v}
+PREFIX_YEAR_MAP_LEGACY: Dict[str, int] = {v: k for k, v in YEAR_PREFIX_MAP_LEGACY.items() if v}
+PREFIX_YEAR_MAP_MODERN: Dict[str, int] = {v: k for k, v in YEAR_PREFIX_MAP_MODERN.items() if v}
 
 # All valid HRS years (1992-2022, biennial)
-HRS_YEARS: Set[int] = {1992, 1994, 1996, 1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022}
+HRS_YEARS: Set[int] = HRS_LEGACY_YEARS | HRS_MODERN_YEARS
 
 # AHEAD cohort years (merged with HRS)
 AHEAD_YEARS: Set[int] = {1993, 1995}
+
+
+def get_core_period(year: int) -> CoreDataPeriod:
+    """Return the core data period for a given year (Legacy 1992-2004 vs Modern 2006-2022)."""
+    if year in HRS_LEGACY_YEARS:
+        return CoreDataPeriod.LEGACY
+    if year in HRS_MODERN_YEARS:
+        return CoreDataPeriod.MODERN
+    if year in AHEAD_YEARS:
+        return CoreDataPeriod.LEGACY
+    return CoreDataPeriod.MODERN  # default for unknown years
 
 
 def extract_base_name(var_name: str) -> str:
@@ -102,27 +133,40 @@ def extract_base_name(var_name: str) -> str:
     return var_name
 
 
-def get_year_prefix(year: int) -> str:
+def get_year_prefix(year: int, period: Optional[CoreDataPeriod] = None) -> str:
     """Get the variable name prefix for a given year.
+    
+    Uses period-specific map when period is given; otherwise infers period from year.
+    Legacy (1996-2004) and Modern (2008-2022) may use different conventions in source data.
     
     Args:
         year: Survey year (1992-2022)
+        period: If set, use prefix map for that period; otherwise infer from year
     
     Returns:
         Prefix string (e.g., 'R' for 2020, 'E' for 1996, '' for 1992-1994)
     """
+    if period is not None:
+        if period == CoreDataPeriod.LEGACY:
+            return YEAR_PREFIX_MAP_LEGACY.get(year, "")
+        return YEAR_PREFIX_MAP_MODERN.get(year, "")
     return YEAR_PREFIX_MAP.get(year, "")
 
 
-def get_year_from_prefix(prefix: str) -> Optional[int]:
+def get_year_from_prefix(prefix: str, period: Optional[CoreDataPeriod] = None) -> Optional[int]:
     """Get the year associated with a variable name prefix.
     
     Args:
         prefix: Variable name prefix (e.g., 'R', 'Q', 'E')
+        period: If set, look up only in that period's map; otherwise use global map
     
     Returns:
         Year if prefix is found, None otherwise
     """
+    if period is not None:
+        if period == CoreDataPeriod.LEGACY:
+            return PREFIX_YEAR_MAP_LEGACY.get(prefix)
+        return PREFIX_YEAR_MAP_MODERN.get(prefix)
     return PREFIX_YEAR_MAP.get(prefix)
 
 
@@ -402,12 +446,16 @@ class VariableTemporalMapping(BaseModel):
 
 
 class Codebook(BaseModel):
-    """Represents a complete parsed codebook for a survey year (1992-2022)."""
+    """Represents a complete parsed codebook for a survey year (1992-2022).
+    
+    Use CodebookLegacy for 1992-2004 (different conventions) and CodebookModern for 2008-2022.
+    """
     # Identification
     source: str = Field(..., description="Source identifier (e.g., 'hrs_core_codebook')")
     year: int = Field(..., description="Survey year (1992-2022)")
     release_type: Optional[str] = Field(None, description="Release type (e.g., 'Final Release', 'Version 3')")
     wave: Optional[int] = Field(None, description="HRS wave number (e.g., 3 for 1996, 15 for 2020)")
+    core_period: Optional[CoreDataPeriod] = Field(None, description="Legacy (1992-2004) vs Modern (2008-2022)")
     
     # Structure
     sections: List[Section] = Field(default_factory=list, description="Sections in the codebook")
@@ -428,11 +476,22 @@ class Codebook(BaseModel):
                 "source": "hrs_core_codebook",
                 "year": 2020,
                 "release_type": "Final Release",
+                "core_period": "modern",
                 "total_variables": 5000,
                 "total_sections": 25,
                 "levels": ["Household", "Respondent"]
             }
         }
+
+
+class CodebookLegacy(Codebook):
+    """Codebook for legacy core data (1992-2004). Uses legacy naming and structure conventions."""
+    core_period: CoreDataPeriod = Field(default=CoreDataPeriod.LEGACY, description="Always legacy")
+
+
+class CodebookModern(Codebook):
+    """Codebook for modern core data (2008-2022). Uses standardized naming and structure."""
+    core_period: CoreDataPeriod = Field(default=CoreDataPeriod.MODERN, description="Always modern")
 
 
 class CrossYearVariableCatalog(BaseModel):
