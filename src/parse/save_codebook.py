@@ -119,6 +119,7 @@ def save_cross_year_catalog(
             str(year): {
                 "source": cb.source,
                 "year": cb.year,
+                "core_period": cb.core_period.value if getattr(cb, "core_period", None) else None,
                 "total_variables": cb.total_variables,
                 "total_sections": cb.total_sections,
             }

@@ -3,9 +3,10 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from .parse_txt_codebook import parse_txt_codebook
+from .parse_early_1992_1994 import parse_and_merge_early_codebook
 from .save_codebook import save_codebook_json, save_cross_year_catalog
 from src.models.cores import (
     CrossYearVariableCatalog, 
@@ -17,12 +18,18 @@ from src.models.cores import (
 )
 
 
+# 1992/1994: exclude toc and master-code-only files (no variable blocks)
+_EARLY_EXCLUDE_BASENAMES = frozenset({"01_COVER.TXT", "01_COVER.txt", "02_MCODE.TXT", "02_MCODE.txt", "01_W2MAS.TXT", "01_W2MAS.txt"})
+
+
 def find_codebook_files(data_dir: Path, year: Optional[int] = None) -> List[Path]:
     """Find codebook files in the data directory.
     
-    Looks for files matching pattern: data/HRS Data/{year}/Core/h{year}cb/h{year}cb.txt
+    - 1992: HRS Data/1992/Core/h92core/h92cb/*.TXT (multiple section files)
+    - 1994: HRS Data/1994/Core/h94core/h94cb/*.TXT (multiple section files)
+    - 1996+: HRS Data/{year}/Core/h{yy}cb/h{year}cb.txt or h{yy}cb.txt (single file)
     """
-    codebooks = []
+    codebooks: List[Path] = []
     
     if year:
         year_dirs = [data_dir / "HRS Data" / str(year)]
@@ -35,25 +42,60 @@ def find_codebook_files(data_dir: Path, year: Optional[int] = None) -> List[Path
     for year_dir in year_dirs:
         if not year_dir.exists():
             continue
-        
-        # Look for Core/h{year}cb/h{year}cb.txt
         core_dir = year_dir / "Core"
         if not core_dir.exists():
             continue
         
-        # Find h{year}cb directories
+        year_int = int(year_dir.name)
+        year_2d = year_int % 100
+        
+        # 1992, 1994: multi-file layout h92core/h92cb/*.TXT or h94core/h94cb/*.TXT
+        if year_int in (1992, 1994):
+            early_core = core_dir / f"h{year_2d}core" / f"h{year_2d}cb"
+            if early_core.exists():
+                for f in early_core.iterdir():
+                    if f.is_file() and f.suffix.upper() == ".TXT" and f.name not in _EARLY_EXCLUDE_BASENAMES:
+                        if f not in codebooks:
+                            codebooks.append(f)
+            continue
+        
+        # 1996+: single (or few) codebook file(s) under h*cb directory
         for subdir in core_dir.iterdir():
             if subdir.is_dir() and "cb" in subdir.name.lower():
-                codebook_file = subdir / f"h{year_dir.name}cb.txt"
-                if codebook_file.exists():
-                    codebooks.append(codebook_file)
-                else:
-                    # Try alternative naming
-                    alt_file = subdir / f"{subdir.name}.txt"
-                    if alt_file.exists():
-                        codebooks.append(alt_file)
+                candidates = [
+                    subdir / f"h{year_dir.name}cb.txt",
+                    subdir / f"h{year_2d:02d}cb.txt",
+                    subdir / f"{subdir.name}.txt",
+                ]
+                for codebook_file in candidates:
+                    if codebook_file.exists() and codebook_file not in codebooks:
+                        codebooks.append(codebook_file)
+                        break
     
     return sorted(codebooks)
+
+
+def _year_from_path(path: Path) -> Optional[int]:
+    """Extract year from path like .../HRS Data/1992/Core/... or .../1994/..."""
+    parts = path.parts
+    for i, p in enumerate(parts):
+        if p.isdigit() and len(p) == 4 and 1990 <= int(p) <= 2030:
+            return int(p)
+    return None
+
+
+def group_codebook_files_by_year(
+    codebook_files: List[Path],
+) -> List[Tuple[int, List[Path]]]:
+    """Group codebook file paths by year. For 1992/1994 multiple files per year."""
+    by_year: dict = {}
+    for p in codebook_files:
+        y = _year_from_path(p)
+        if y is None:
+            y = int(p.parent.parent.parent.name) if p.parent.parent.parent.name.isdigit() else None
+        if y is not None:
+            by_year.setdefault(y, []).append(p)
+    return sorted((year, sorted(paths)) for year, paths in by_year.items())
 
 
 def build_cross_year_catalog(codebooks: List[dict]) -> CrossYearVariableCatalog:
@@ -154,28 +196,28 @@ def main():
         print("No codebook files found!")
         sys.exit(1)
     
-    print(f"Found {len(codebook_files)} codebook file(s)")
+    # Group by year (1992/1994 have multiple files per year)
+    year_groups = group_codebook_files_by_year(codebook_files)
+    print(f"Found {sum(len(p) for _, p in year_groups)} file(s) across {len(year_groups)} year(s)")
     
-    # Parse codebooks
     parsed_codebooks = []
-    for codebook_file in codebook_files:
-        print(f"\nParsing: {codebook_file}")
+    for year, paths in year_groups:
         try:
-            year = int(codebook_file.parent.parent.parent.name) if codebook_file.parent.parent.parent.name.isdigit() else None
-            codebook = parse_txt_codebook(codebook_file, source=args.source, year=year)
+            if year in (1992, 1994) and len(paths) > 1:
+                print(f"\nParsing {len(paths)} files for {year} (early format)...")
+                codebook = parse_and_merge_early_codebook(paths, year=year, source=args.source)
+                print(f"  Parsed {codebook.total_variables} variables in {codebook.total_sections} sections")
+            else:
+                codebook_file = paths[0]
+                print(f"\nParsing: {codebook_file}")
+                codebook = parse_txt_codebook(codebook_file, source=args.source, year=year)
+                print(f"  Parsed {codebook.total_variables} variables in {codebook.total_sections} sections")
             
-            print(f"  Parsed {codebook.total_variables} variables in {codebook.total_sections} sections")
-            
-            # Save to JSON
             output_file = save_codebook_json(codebook, args.output_dir)
             print(f"  Saved to: {output_file}")
-            
-            parsed_codebooks.append({
-                "file": codebook_file,
-                "codebook": codebook,
-            })
+            parsed_codebooks.append({"file": paths[0] if len(paths) == 1 else paths[0].parent, "codebook": codebook})
         except Exception as e:
-            print(f"  ERROR: Failed to parse {codebook_file}: {e}")
+            print(f"  ERROR: Failed to parse year {year}: {e}")
             import traceback
             traceback.print_exc()
             continue

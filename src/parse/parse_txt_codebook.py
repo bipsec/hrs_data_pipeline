@@ -7,6 +7,8 @@ from datetime import datetime
 
 from src.models.cores import (
     Codebook,
+    CodebookLegacy,
+    CodebookModern,
     Variable,
     ValueCode,
     Section,
@@ -14,6 +16,9 @@ from src.models.cores import (
     VariableType,
     VariableAssignment,
     VariableReference,
+    CoreDataPeriod,
+    get_core_period,
+    get_wave_number,
 )
 
 
@@ -24,13 +29,15 @@ def parse_txt_codebook(
 ) -> Codebook:
     """Parse a text codebook file and extract variables according to the model.
     
+    Returns CodebookLegacy for years 1992-2004 and CodebookModern for 2006-2022.
+    
     Args:
         txt_path: Path to the text codebook file
         source: Source identifier (e.g., 'hrs_core_codebook')
         year: Survey year (extracted from filename if not provided)
     
     Returns:
-        Parsed Codebook object
+        Parsed Codebook (CodebookLegacy or CodebookModern) by core period
     """
     if not txt_path.exists():
         raise FileNotFoundError(f"Codebook file not found: {txt_path}")
@@ -57,11 +64,14 @@ def parse_txt_codebook(
         line = lines[i].strip()
         
         # Check for section header
-        section_match = re.match(r"^Section\s+([A-Z]+):\s+(.+?)\s+\((.+?)\)", line)
+        # 2002/2004: "SECTION PR: Preload (Household)"; modern: "Section A: Name (Level)"
+        section_match = re.match(
+            r"(?i)^section\s+([A-Z]+):\s+(.+?)(?:\s+\((.+?)\))?\s*$", line
+        )
         if section_match:
             current_section = section_match.group(1)
             current_section_name = section_match.group(2).strip()
-            level_str = section_match.group(3).strip()
+            level_str = section_match.group(3).strip() if section_match.group(3) else "Respondent"
             current_level = _parse_level(level_str)
             
             # Create or update section
@@ -75,46 +85,65 @@ def parse_txt_codebook(
             i += 1
             continue
         
-        # Check for variable definition (variable name and description on same line)
-        # Pattern: VARNAME                         DESCRIPTION
+        # Check for variable definition
+        # Modern: VARNAME                         DESCRIPTION (name and description on same line)
+        # Legacy: VARNAME alone, then metadata line with Type/Width; or VARNAME, description line, then metadata
         var_match = re.match(r"^([A-Z0-9_]+)\s{2,}(.+)$", line)
-        if var_match and current_section:
-            var_name = var_match.group(1).strip()
-            var_description = var_match.group(2).strip()
-            
-            # Look ahead for metadata line
-            if i + 1 < len(lines):
-                metadata_line = lines[i + 1].strip()
-                var_data = _parse_variable_metadata(metadata_line, var_name, var_description, 
-                                                   current_section, current_level, year)
-                
-                if var_data:
-                    # Parse value codes and assignments
-                    i += 2  # Skip variable name and metadata lines
-                    value_codes, assignments, references, notes = _parse_variable_content(
-                        lines, i, var_data
-                    )
-                    
-                    var_data["value_codes"] = value_codes
-                    var_data["assignments"] = assignments
-                    var_data["references"] = references
-                    var_data["notes"] = notes
-                    var_data["has_value_codes"] = len(value_codes) > 0
-                    
-                    # Check if identifier
-                    var_data["is_identifier"] = _is_identifier(var_name, var_description)
-                    
-                    variable = Variable(**var_data)
-                    variables.append(variable)
-                    
-                    # Update section
-                    sections[current_section].variables.append(var_name)
-                    sections[current_section].variable_count += 1
-                    
-                    # Skip to next separator or variable
-                    while i < len(lines) and not _is_separator(lines[i]) and not _is_variable_start(lines[i]):
-                        i += 1
-                    continue
+        var_name_only = re.match(r"^([A-Z0-9_]+)\s*$", line) and current_section and line.strip()
+        if (var_match or var_name_only) and current_section:
+            if var_match:
+                var_name = var_match.group(1).strip()
+                var_description = var_match.group(2).strip()
+                metadata_line_idx = i + 1
+            else:
+                var_name = line.strip()
+                var_description = var_name
+                metadata_line_idx = i + 1
+                if i + 2 < len(lines):
+                    next_ln = lines[i + 1].strip()
+                    next_next = lines[i + 2].strip()
+                    if _parse_variable_metadata(next_next, var_name, next_ln or var_description,
+                                                current_section, current_level, year) and not _parse_variable_metadata(
+                        next_ln, var_name, var_description, current_section, current_level, year
+                    ):
+                        var_description = next_ln or var_description
+                        metadata_line_idx = i + 2
+            # 2002/2004: metadata can follow after 0 or 1 blank lines; scan forward
+            var_data = None
+            if metadata_line_idx < len(lines):
+                for offset in range(0, min(4, len(lines) - metadata_line_idx)):
+                    candidate_idx = metadata_line_idx + offset
+                    metadata_line = lines[candidate_idx].strip()
+                    if not metadata_line:
+                        continue
+                    var_data = _parse_variable_metadata(metadata_line, var_name, var_description,
+                                                       current_section, current_level, year)
+                    if var_data:
+                        metadata_line_idx = candidate_idx
+                        break
+                else:
+                    var_data = None
+            if var_data:
+                # Skip variable name line and any description line, then metadata line
+                lines_to_skip = (metadata_line_idx - i) + 1
+                i += lines_to_skip
+                # Parse value codes and assignments
+                value_codes, assignments, references, notes = _parse_variable_content(
+                    lines, i, var_data
+                )
+                var_data["value_codes"] = value_codes
+                var_data["assignments"] = assignments
+                var_data["references"] = references
+                var_data["notes"] = notes
+                var_data["has_value_codes"] = len(value_codes) > 0
+                var_data["is_identifier"] = _is_identifier(var_name, var_description)
+                variable = Variable(**var_data)
+                variables.append(variable)
+                sections[current_section].variables.append(var_name)
+                sections[current_section].variable_count += 1
+                while i < len(lines) and not _is_separator(lines[i]) and not _is_variable_start(lines[i]):
+                    i += 1
+                continue
         
         i += 1
     
@@ -127,24 +156,29 @@ def parse_txt_codebook(
     for var in variables:
         levels.add(var.level)
     
-    # Create codebook
-    codebook = Codebook(
-        source=source,
-        year=year,
-        release_type=release_type,
-        sections=list(sections.values()),
-        variables=variables,
-        total_variables=len(variables),
-        total_sections=len(sections),
-        levels=levels,
-        metadata={
+    # Build codebook payload and use period-specific model (Legacy 1992-2004 vs Modern 2008-2022)
+    period = get_core_period(year)
+    wave = get_wave_number(year)
+    payload = {
+        "source": source,
+        "year": year,
+        "release_type": release_type,
+        "wave": wave,
+        "core_period": period,
+        "sections": list(sections.values()),
+        "variables": variables,
+        "total_variables": len(variables),
+        "total_sections": len(sections),
+        "levels": levels,
+        "metadata": {
             "file_path": str(txt_path),
             "file_name": txt_path.name,
         },
-        parsed_at=datetime.now(),
-    )
-    
-    return codebook
+        "parsed_at": datetime.now(),
+    }
+    if period == CoreDataPeriod.LEGACY:
+        return CodebookLegacy(**payload)
+    return CodebookModern(**payload)
 
 
 def _extract_year_from_filename(path: Path) -> int:
@@ -195,11 +229,17 @@ def _parse_variable_metadata(
 ) -> Optional[Dict]:
     """Parse variable metadata line.
     
-    Example: Section: PR    Level: Household       Type: Character  Width: 6   Decimals: 0
+    Modern: Section: PR    Level: Household       Type: Character  Width: 6   Decimals: 0
+    Legacy (1992-2004): may have Type/Width without Section: prefix; use current section/level.
     """
-    # Extract section
-    section_match = re.search(r"Section:\s*([A-Z]+)", metadata_line)
-    if not section_match:
+    # Extract section from line if present (modern format)
+    section_match = re.search(r"[Ss]ection:\s*([A-Z]+)", metadata_line)
+    use_section = section_match.group(1) if section_match else section
+    
+    # Legacy: require at least Type: or Width: to consider this a metadata line
+    type_match = re.search(r"Type:\s*(\w+)", metadata_line)
+    width_match = re.search(r"Width:\s*(\d+)", metadata_line)
+    if not type_match and not width_match:
         return None
     
     # Extract level
@@ -207,25 +247,20 @@ def _parse_variable_metadata(
     level_str = level_match.group(1).strip() if level_match else str(level.value)
     parsed_level = _parse_level(level_str)
     
-    # Extract type
-    type_match = re.search(r"Type:\s*(\w+)", metadata_line)
     var_type = VariableType.CHARACTER
     if type_match:
         type_str = type_match.group(1).strip()
         var_type = VariableType.CHARACTER if "Character" in type_str else VariableType.NUMERIC
     
-    # Extract width
-    width_match = re.search(r"Width:\s*(\d+)", metadata_line)
     width = int(width_match.group(1)) if width_match else 0
     
-    # Extract decimals
     decimals_match = re.search(r"Decimals:\s*(\d+)", metadata_line)
     decimals = int(decimals_match.group(1)) if decimals_match else 0
     
     return {
         "name": var_name,
         "year": year,
-        "section": section,
+        "section": use_section,
         "level": parsed_level,
         "description": var_description,
         "type": var_type,
