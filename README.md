@@ -22,6 +22,13 @@ hrs_data_pipeline/
 │   │   ├── mongodb_client.py    # MongoDB connection
 │   │   └── load_codebooks.py    # Data loading script
 │   ├── api/                     # FastAPI application
+│   │   ├── routes/              # general, codebooks, variables, sections, search, utilities, categorizer
+│   │   ├── models/              # Pydantic response models (responses.py)
+│   │   └── static/              # Web UI
+│   │       ├── css/             # base, layout, components, categorization, utilities
+│   │       ├── js/              # state, api, tabs, filters, dashboard, codebooks, categorization, search, sections, modal, utilities, app
+│   │       ├── index.html
+│   │       └── styles.css
 │   └── test/                    # Unit tests
 ├── data/
 │   ├── raw/                     # Fetched raw codebook files
@@ -135,16 +142,25 @@ The API and UI will be available at `http://localhost:8000`
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
+**Web UI tabs:** Dashboard (years/sources), Codebooks, Categorization (full / by section / level / type / base name / special), Search Variables, Sections, Utilities (extract base name, construct variable name, year↔prefix). Search results and variable-detail modal require a valid year (1992–2030) in filters; year options in dropdowns exclude invalid values (e.g. 0). Static assets are modular: CSS under `static/css/`, JS under `static/js/` (see `report/UI.md`).
+
 **Example Endpoints:**
 - `GET /codebooks` - List all codebooks
 - `GET /codebooks/{year}` - Get codebook by year
-- `GET /variables/{variable_name}?year=2020` - Get variable details
-- `GET /search?q=SUBHH` - Search variables
+- `GET /variables?year=2020&source=hrs_core_codebook` - List variables (optional section, level, limit)
+- `GET /variables/{variable_name}?year=2020&source=hrs_core_codebook` - Get variable details (year required, 1992–2030)
+- `GET /variables/base/SUBHH` - Variable by base name (optional `years=2016,2020`)
+- `GET /variables/base/SUBHH/temporal` - Temporal mapping for base name
+- `GET /search?q=SUBHH&year=2020` - Search variables
 - `GET /sections?year=2020` - Get sections for a year
 - `GET /years` - Get available years and sources
 - `GET /stats` - Get database statistics
+- `GET /categorization?year=2020` - Full categorization; also `GET /categorization/sections`, `/levels`, `/types`, `/base-names`, `/special`
+- `GET /utils/extract-base-name?variable_name=RSUBHH` - Extract base name
+- `GET /utils/construct-variable-name?base_name=SUBHH&year=2020` - Construct variable name
+- `GET /utils/year-prefix`, `GET /utils/prefix-year` - Year↔prefix mapping
 
-See `src/api/README.md` for complete API documentation.
+See `report/APIS.md` and `src/api/README.md` (if present) for full API and model details.
 
 ### Configuration
 
@@ -167,26 +183,68 @@ uv sync --extra dev
 python.exe -m pytest -q
 ```
 
-### API ENDPOINTS
+### Variable endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/variables` | List variables with optional filters |
+| GET | `/variables/{variable_name}` | Get one variable’s full details (year + source required) |
+| GET | `/variables/base/{base_name}` | Get a variable by base name across one or all years |
+| GET | `/variables/base/{base_name}/temporal` | Get temporal mapping (years, prefixes) for a base name |
+
+**Examples:**
+
 ```bash
-# Get SUBHH variable across all years
+# List variables for a codebook (optional: section, level, limit; default limit=100)
+GET /variables?year=2020&source=hrs_core_codebook
+GET /variables?year=2020&section=Household%20Roster&limit=50
+
+# Get full details for a specific variable (year required, 1992–2030)
+GET /variables/RSUBHH?year=2020&source=hrs_core_codebook
+# Returns: name, description, year, section, level, type, width, decimals, value_codes, assignments, references
+
+# Get SUBHH across all years (optional: source, default hrs_core_codebook)
 GET /variables/base/SUBHH
 
-# Get SUBHH variable for specific years
+# Get SUBHH for specific years only
 GET /variables/base/SUBHH?years=2016,2018,2020
+GET /variables/base/SUBHH?years=2016,2018,2020&source=hrs_core_codebook
 
-# Get temporal mapping for SUBHH
+# Get temporal mapping for a base name (years present, year→prefix, first/last year)
 GET /variables/base/SUBHH/temporal
+# Returns: base_name, years[], year_prefixes{}, first_year, last_year, consistent_metadata, consistent_values
+```
 
-# Get wave information
-GET /waves/15  # Returns wave 15 (2020)
+### Other API endpoints
 
-# Extract base name
+```bash
+# Wave information
+GET /waves/15
+# Returns wave 15 (e.g. year 2020)
+
+# Extract base name from variable name
 GET /utils/extract-base-name?variable_name=RSUBHH
 # Returns: {"variable_name": "RSUBHH", "base_name": "SUBHH", "prefix": "R"}
 
-# Construct variable name
+# Construct variable name from base name and year
 GET /utils/construct-variable-name?base_name=SUBHH&year=2020
 # Returns: {"base_name": "SUBHH", "year": 2020, "wave": 15, "prefix": "R", "variable_name": "RSUBHH"}
 
+# Year ↔ prefix (wave) mapping
+GET /utils/year-prefix?year=2020
+GET /utils/prefix-year?prefix=R
+```
+
+### Codebook Discovery
+# Categorize all years
+python -m src.discovery.discover_codebooks
+
+# Categorize specific year
+python -m src.discovery.discover_codebooks --year 2020
+
+# Save to JSON file
+python -m src.discovery.discover_codebooks --output report/categorization.json
+
+# Include variable names in output
+python -m src.discovery.discover_codebooks --output report/categorization.json --include-names
 ```
