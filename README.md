@@ -9,32 +9,38 @@ hrs_data_pipeline/
 ├── config/
 │   └── sources.yaml              # Data source configuration
 ├── src/
-│   ├── discovery/               # Codebook discovery module
-│   ├── fetch/                   # Data fetching module
-│   │   ├── client.py            # HTTP client
-│   │   └── fetch_sources.py     # Main fetching script
-│   ├── parse/                   # Codebook parsing module
-│   │   ├── models.py            # Pydantic data models
+│   ├── config_loader.py          # Config loading utilities
+│   ├── discovery/                # Codebook discovery module
+│   ├── fetch/                    # Data fetching module
+│   │   ├── client.py             # HTTP client
+│   │   └── fetch_sources.py      # Main fetching script
+│   ├── parse/                    # Codebook parsing module
+│   │   ├── parse_codebooks.py    # Main parsing script (core)
+│   │   ├── parse_by_source.py   # Parse by source (core/exit)
+│   │   ├── parse_exit_codebook.py # Exit codebook parsing
 │   │   ├── parse_txt_codebook.py
-│   │   ├── parse_codebooks.py   # Main parsing script
-│   │   └── save_codebook.py     # JSON save utilities
-│   ├── database/                # MongoDB integration
-│   │   ├── mongodb_client.py    # MongoDB connection
-│   │   └── load_codebooks.py    # Data loading script
-│   ├── api/                     # FastAPI application
-│   │   ├── routes/              # general, codebooks, variables, sections, search, utilities, categorizer
-│   │   ├── models/              # Pydantic response models (responses.py)
-│   │   └── static/              # Web UI
-│   │       ├── css/             # base, layout, components, categorization, utilities
-│   │       ├── js/              # state, api, tabs, filters, dashboard, codebooks, categorization, search, sections, modal, utilities, app
+│   │   ├── save_codebook.py      # JSON save utilities
+│   │   └── ...
+│   ├── database/                 # MongoDB integration
+│   │   ├── mongodb_client.py     # MongoDB connection
+│   │   └── load_codebooks.py     # Data loading script
+│   ├── api/                      # FastAPI application
+│   │   ├── routes/
+│   │   │   ├── core/             # codebooks, variables, sections, search
+│   │   │   ├── exit/             # Exit codebook routes (routes.py)
+│   │   │   └── shared/           # general, categorizer, utilities
+│   │   ├── models/               # Pydantic response models (responses.py)
+│   │   └── static/               # Web UI
+│   │       ├── css/              # base, layout, components, categorization, exit, utilities
+│   │       ├── js/               # api, app, dashboard, codebooks, exit, categorization, modal, search, sections, tabs, utils, ...
 │   │       ├── index.html
 │   │       └── styles.css
-│   └── test/                    # Unit tests
+│   └── test/                     # Unit tests
 ├── data/
-│   ├── raw/                     # Fetched raw codebook files
-│   └── parsed/                  # Structured JSON output
-├── report/                      # Documentation and reports
-└── scripts/                     # Utility scripts
+│   ├── raw/                      # Fetched raw codebook files
+│   └── parsed/                   # Structured JSON output
+├── report/                       # Documentation and reports
+└── scripts/                      # Utility scripts
 ```
 
 ## Usage
@@ -77,16 +83,16 @@ Configured sources include:
 
 ### Parsing Codebooks
 
-Parse codebook files into structured JSON:
+Parse codebook files into structured JSON (core and exit use separate parsers; `parse_codebooks` for core, `parse_exit_codebook` / `parse_by_source` for exit):
 
 ```bash
-# Parse specific year
+# Parse specific year (core)
 python -m src.parse.parse_codebooks --data-dir data --output-dir data/parsed --year 2020
 
-# Parse all years
+# Parse all years (core)
 python -m src.parse.parse_codebooks --data-dir data --output-dir data/parsed
 
-# Build cross-year catalog
+# Build cross-year catalog (core)
 python -m src.parse.parse_codebooks --build-catalog
 ```
 
@@ -100,8 +106,9 @@ Load parsed codebooks into MongoDB:
 # Load all codebooks
 python -m src.database.load_codebooks
 
-# Load specific source
+# Load specific source (core or exit)
 python -m src.database.load_codebooks --source hrs_core_codebook
+python -m src.database.load_codebooks --source hrs_exit_codebook
 
 # Load specific year
 python -m src.database.load_codebooks --year 2020
@@ -142,25 +149,9 @@ The API and UI will be available at `http://localhost:8000`
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
-**Web UI tabs:** Dashboard (years/sources), Codebooks, Categorization (full / by section / level / type / base name / special), Search Variables, Sections, Utilities (extract base name, construct variable name, year↔prefix). Search results and variable-detail modal require a valid year (1992–2030) in filters; year options in dropdowns exclude invalid values (e.g. 0). Static assets are modular: CSS under `static/css/`, JS under `static/js/` (see `report/UI.md`).
+**Web UI tabs:** Dashboard (years/sources), Codebooks, **Exit Codebooks**, Categorization (full / by section / level / type / base name / special), Search Variables, Sections, Utilities (extract base name, construct variable name, year↔prefix). **Exit Codebooks:** load exit codebooks by year; click a codebook to open the detail panel with Sections and Variables tabs. Sections and variables load in parallel with a single loading state; variables are lazy-loaded in batches with a “Load more” button. Close, Sections, and Variables buttons use the same design pattern as the Search Exit row. Search results and variable-detail modal require a valid year (1992–2030) in filters; year options in dropdowns exclude invalid values (e.g. 0). Static assets are modular: CSS under `static/css/`, JS under `static/js/` (see `report/UI.md`).
 
-**Example Endpoints:**
-- `GET /codebooks` - List all codebooks
-- `GET /codebooks/{year}` - Get codebook by year
-- `GET /variables?year=2020&source=hrs_core_codebook` - List variables (optional section, level, limit)
-- `GET /variables/{variable_name}?year=2020&source=hrs_core_codebook` - Get variable details (year required, 1992–2030)
-- `GET /variables/base/SUBHH` - Variable by base name (optional `years=2016,2020`)
-- `GET /variables/base/SUBHH/temporal` - Temporal mapping for base name
-- `GET /search?q=SUBHH&year=2020` - Search variables
-- `GET /sections?year=2020` - Get sections for a year
-- `GET /years` - Get available years and sources
-- `GET /stats` - Get database statistics
-- `GET /categorization?year=2020` - Full categorization; also `GET /categorization/sections`, `/levels`, `/types`, `/base-names`, `/special`
-- `GET /utils/extract-base-name?variable_name=RSUBHH` - Extract base name
-- `GET /utils/construct-variable-name?base_name=SUBHH&year=2020` - Construct variable name
-- `GET /utils/year-prefix`, `GET /utils/prefix-year` - Year↔prefix mapping
-
-See `report/APIS.md` and `src/api/README.md` (if present) for full API and model details.
+See below for **API Endpoints** and `report/APIS.md` (if present) for full API and model details.
 
 ### Configuration
 
@@ -183,59 +174,91 @@ uv sync --extra dev
 python.exe -m pytest -q
 ```
 
-### Variable endpoints
+### API Endpoints
+
+**General**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/variables` | List variables with optional filters |
-| GET | `/variables/{variable_name}` | Get one variable’s full details (year + source required) |
-| GET | `/variables/base/{base_name}` | Get a variable by base name across one or all years |
-| GET | `/variables/base/{base_name}/temporal` | Get temporal mapping (years, prefixes) for a base name |
+| GET | `/` | Root / UI redirect |
+| GET | `/years` | Available years and sources |
+| GET | `/stats` | Database statistics |
+| GET | `/waves` | List wave info |
+| GET | `/waves/{wave}` | Wave details (e.g. wave 15 → year 2020) |
 
-**Examples:**
+**Core codebooks & variables**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/codebooks` | List codebooks (optional `?year=`, `?source=`) |
+| GET | `/codebooks/{year}` | Codebook summary for a year |
+| GET | `/variables` | List variables (`year`, `source`; optional `section`, `level`, `limit`) |
+| GET | `/variables/{variable_name}` | Variable details (requires `?year=` and `?source=`) |
+| GET | `/variables/base/{base_name}` | Variable by base name (optional `?years=`, `?source=`) |
+| GET | `/variables/base/{base_name}/temporal` | Temporal mapping (years, prefixes) for base name |
+| GET | `/search` | Search variables (`?q=`, optional `?year=`, `?source=`, `?limit=`) |
+| GET | `/sections` | List sections for a year (`?year=`) |
+| GET | `/sections/{section_code}` | Section details (`?year=`) |
+
+**Exit codebooks & variables**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/exit/codebooks` | List exit codebooks (optional `?year=`, `?source=`) |
+| GET | `/exit/codebooks/{year}` | Exit codebook summary for a year |
+| GET | `/exit/variables` | List exit variables (`?year=`, optional `?limit=`) |
+| GET | `/exit/variables/{variable_name}` | Exit variable details (`?year=`) |
+| GET | `/exit/sections` | List exit sections (`?year=`) |
+| GET | `/exit/sections/{section_code}` | Exit section details (`?year=`) |
+| GET | `/exit/search` | Search exit variables (`?q=`, optional `?year=`, `?limit=`) |
+
+**Categorization**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/categorization` | Full categorization (`?year=`) |
+| GET | `/categorization/sections` | By section |
+| GET | `/categorization/levels` | By level |
+| GET | `/categorization/types` | By type |
+| GET | `/categorization/base-names` | By base name |
+| GET | `/categorization/special` | Special categories |
+
+**Utilities**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/utils/extract-base-name` | Extract base name from variable (`?variable_name=`) |
+| GET | `/utils/construct-variable-name` | Construct variable name (`?base_name=`, `?year=`) |
+| GET | `/utils/year-prefix` | Year → prefix (`?year=`) |
+| GET | `/utils/prefix-year` | Prefix → year (`?prefix=`) |
+
+**Example requests**
 
 ```bash
-# List variables for a codebook (optional: section, level, limit; default limit=100)
-GET /variables?year=2020&source=hrs_core_codebook
-GET /variables?year=2020&section=Household%20Roster&limit=50
-
-# Get full details for a specific variable (year required, 1992–2030)
+# Core variables
+GET /variables?year=2020&source=hrs_core_codebook&limit=50
 GET /variables/RSUBHH?year=2020&source=hrs_core_codebook
-# Returns: name, description, year, section, level, type, width, decimals, value_codes, assignments, references
-
-# Get SUBHH across all years (optional: source, default hrs_core_codebook)
-GET /variables/base/SUBHH
-
-# Get SUBHH for specific years only
 GET /variables/base/SUBHH?years=2016,2018,2020
-GET /variables/base/SUBHH?years=2016,2018,2020&source=hrs_core_codebook
-
-# Get temporal mapping for a base name (years present, year→prefix, first/last year)
 GET /variables/base/SUBHH/temporal
-# Returns: base_name, years[], year_prefixes{}, first_year, last_year, consistent_metadata, consistent_values
-```
+GET /search?q=SUBHH&year=2020
 
-### Other API endpoints
+# Exit
+GET /exit/codebooks?year=2020
+GET /exit/sections?year=2020
+GET /exit/variables?year=2020&limit=1000
+GET /exit/variables/VARNAME?year=2020
+GET /exit/search?q=term&year=2020
 
-```bash
-# Wave information
-GET /waves/15
-# Returns wave 15 (e.g. year 2020)
-
-# Extract base name from variable name
+# Utils
 GET /utils/extract-base-name?variable_name=RSUBHH
-# Returns: {"variable_name": "RSUBHH", "base_name": "SUBHH", "prefix": "R"}
-
-# Construct variable name from base name and year
 GET /utils/construct-variable-name?base_name=SUBHH&year=2020
-# Returns: {"base_name": "SUBHH", "year": 2020, "wave": 15, "prefix": "R", "variable_name": "RSUBHH"}
-
-# Year ↔ prefix (wave) mapping
 GET /utils/year-prefix?year=2020
 GET /utils/prefix-year?prefix=R
 ```
 
 ### Codebook Discovery
+
+```bash
 # Categorize all years
 python -m src.discovery.discover_codebooks
 
