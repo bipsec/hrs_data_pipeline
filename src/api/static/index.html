@@ -11,8 +11,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Styles -->
+    <!-- Styles (modular: base, layout, components, categorization, utilities) -->
+    <link rel="preload" href="/static/styles.css" as="style">
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/css/categorization.css">
+    <link rel="stylesheet" href="/static/css/exit.css">
 </head>
 <body>
     <!-- Header -->
@@ -68,8 +71,11 @@
             <div class="tabs" role="tablist">
                 <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
                 <button class="tab" data-tab="codebooks" role="tab" aria-selected="false">Codebooks</button>
+                <button class="tab" data-tab="exit" role="tab" aria-selected="false">Exit</button>
+                <button class="tab" data-tab="categorization" role="tab" aria-selected="false">Categorization</button>
                 <button class="tab" data-tab="search" role="tab" aria-selected="false">Search Variables</button>
                 <button class="tab" data-tab="sections" role="tab" aria-selected="false">Sections</button>
+                <button class="tab" data-tab="utilities" role="tab" aria-selected="false">Utilities</button>
             </div>
 
             <!-- Dashboard Section -->
@@ -100,11 +106,11 @@
                 </div>
             </div>
 
-            <!-- Codebooks Section -->
+            <!-- Codebooks Section (Core) -->
             <div id="codebooks" class="content-section" role="tabpanel">
                 <div class="section-header">
                     <h2>Codebooks</h2>
-                    <p class="section-description">Browse available codebooks by year and source</p>
+                    <p class="section-description">Browse core codebooks by year and source. Click a codebook to view sections and variables.</p>
                 </div>
                 
                 <div class="filters">
@@ -119,6 +125,147 @@
                 
                 <div id="codebooks-list" class="cards-grid">
                     <div class="empty-state">Select filters and click "Load Codebooks" to view data</div>
+                </div>
+                <div id="core-detail-panel" class="detail-panel" style="display: none;">
+                    <div class="detail-panel-header">
+                        <h3 id="core-detail-title"></h3>
+                        <button type="button" class="btn-secondary btn-sm" onclick="closeCoreDetail()" aria-label="Close">Close</button>
+                    </div>
+                    <div class="detail-panel-tabs">
+                        <button type="button" class="detail-panel-tab active" data-detail-tab="sections" onclick="setCoreDetailTab('sections')">Sections</button>
+                        <button type="button" class="detail-panel-tab" data-detail-tab="variables" onclick="setCoreDetailTab('variables')">Variables</button>
+                    </div>
+                    <div id="core-sections-content" class="detail-panel-content">
+                        <div class="loading">Load a codebook to see sections</div>
+                    </div>
+                    <div id="core-variables-content" class="detail-panel-content" style="display: none;">
+                        <div class="loading">Load a codebook to see variables</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exit Codebooks Section -->
+            <div id="exit" class="content-section" role="tabpanel">
+                <div class="section-header exit-header">
+                    <h2>Exit Codebooks</h2>
+                    <p class="section-description">Exit questionnaire variables (1995–2022). Click a codebook to view sections and variables below.</p>
+                </div>
+                <div class="exit-toolbar">
+                    <div class="exit-filters">
+                        <select id="exit-year-filter" class="filter-select" aria-label="Exit codebook year">
+                            <option value="">All Years</option>
+                        </select>
+                        <button type="button" class="btn-primary" onclick="loadExitCodebooks()">Load Exit Codebooks</button>
+                    </div>
+                    <div class="exit-search-row">
+                        <input type="text" id="exit-search-input" class="search-input exit-search-input" placeholder="Search exit variables by name or description..." aria-label="Search exit variables">
+                        <button type="button" class="search-button" onclick="searchExitVariables()">Search Exit</button>
+                    </div>
+                </div>
+                <div id="exit-codebooks-list" class="exit-cards-grid">
+                    <div class="empty-state">Select a year (or All Years) and click "Load Exit Codebooks" to view exit codebooks</div>
+                </div>
+                <div id="exit-detail-panel" class="detail-panel exit-detail-panel" style="display: none;">
+                    <div class="detail-panel-header">
+                        <div class="exit-detail-header-main">
+                            <h3 id="exit-detail-title">Exit codebook <span id="exit-detail-year"></span></h3>
+                            <p id="exit-detail-summary" class="exit-detail-summary" style="display: none;"></p>
+                        </div>
+                        <button type="button" class="btn-secondary btn-sm" onclick="closeExitDetail()" aria-label="Close">Close</button>
+                    </div>
+                    <div class="detail-panel-tabs">
+                        <button type="button" class="detail-panel-tab active" data-detail-tab="sections" onclick="setExitDetailTab('sections')">Sections</button>
+                        <button type="button" class="detail-panel-tab" data-detail-tab="variables" onclick="setExitDetailTab('variables')">Variables</button>
+                    </div>
+                    <div id="exit-sections-content" class="detail-panel-content">
+                        <div class="loading">Load a codebook to see sections</div>
+                    </div>
+                    <div id="exit-variables-content" class="detail-panel-content" style="display: none;">
+                        <div class="loading">Load a codebook to see variables</div>
+                    </div>
+                </div>
+                <div id="exit-search-results" class="exit-search-results" style="display: none;">
+                    <h3>Search results</h3>
+                    <div id="exit-search-results-list"></div>
+                </div>
+            </div>
+
+            <!-- Categorization Section -->
+            <div id="categorization" class="content-section" role="tabpanel">
+                <div class="section-header">
+                    <h2>Categorization</h2>
+                    <p class="section-description">Variable categorization by section, level, type, base name, and special categories</p>
+                </div>
+
+                <div class="cat-panel">
+                    <div class="cat-filters-row">
+                        <div class="cat-filter-group">
+                            <label class="cat-filter-label">Year</label>
+                            <select id="cat-year-filter" class="cat-filter-select" aria-label="Filter by year">
+                                <option value="">All Years</option>
+                            </select>
+                        </div>
+                        <div class="cat-filter-group">
+                            <label class="cat-filter-label">Source</label>
+                            <select id="cat-source-filter" class="cat-filter-select" aria-label="Filter by source">
+                                <option value="">All Sources</option>
+                            </select>
+                        </div>
+                        <div class="cat-filter-group">
+                            <label class="cat-filter-label">Period</label>
+                            <select id="cat-core-period-filter" class="cat-filter-select" aria-label="Filter by core period">
+                                <option value="">All Periods</option>
+                                <option value="legacy">Legacy (1992–2004)</option>
+                                <option value="modern">Modern (2008–2022)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cat-view-section">
+                        <span class="cat-view-heading">View by</span>
+                        <div class="cat-view-grid" role="group" aria-label="Category view options">
+                            <button type="button" class="cat-view-card btn-cat active" data-cat="full" aria-pressed="true">
+                                <span class="cat-view-icon" aria-hidden="true">◉</span>
+                                <span class="cat-view-label">Full</span>
+                                <span class="cat-view-desc">All dimensions</span>
+                            </button>
+                            <button type="button" class="cat-view-card btn-cat" data-cat="sections" aria-pressed="false">
+                                <span class="cat-view-icon" aria-hidden="true">§</span>
+                                <span class="cat-view-label">By Section</span>
+                                <span class="cat-view-desc">Codebook sections</span>
+                            </button>
+                            <button type="button" class="cat-view-card btn-cat" data-cat="levels" aria-pressed="false">
+                                <span class="cat-view-icon" aria-hidden="true">▤</span>
+                                <span class="cat-view-label">By Level</span>
+                                <span class="cat-view-desc">Household, respondent</span>
+                            </button>
+                            <button type="button" class="cat-view-card btn-cat" data-cat="types" aria-pressed="false">
+                                <span class="cat-view-icon" aria-hidden="true">T</span>
+                                <span class="cat-view-label">By Type</span>
+                                <span class="cat-view-desc">Variable data types</span>
+                            </button>
+                            <button type="button" class="cat-view-card btn-cat" data-cat="base-names" aria-pressed="false">
+                                <span class="cat-view-icon" aria-hidden="true">⌂</span>
+                                <span class="cat-view-label">By Base Name</span>
+                                <span class="cat-view-desc">Cross-year base names</span>
+                            </button>
+                            <button type="button" class="cat-view-card btn-cat" data-cat="special" aria-pressed="false">
+                                <span class="cat-view-icon" aria-hidden="true">★</span>
+                                <span class="cat-view-label">Special</span>
+                                <span class="cat-view-desc">IDs, derived, prefixes</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cat-actions">
+                        <button type="button" class="btn-cat-load" onclick="loadCategorization()">
+                            <span class="btn-cat-load-text">Load Categorization</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="categorization-content" class="categorization-content">
+                    <div class="empty-state">Choose a view above and click "Load Categorization" to see data</div>
                 </div>
             </div>
 
@@ -165,18 +312,92 @@
                 </div>
             </div>
 
+            <!-- Utilities Section -->
+            <div id="utilities" class="content-section" role="tabpanel">
+                <div class="section-header">
+                    <h2>Utilities</h2>
+                    <p class="section-description">Extract base name, construct variable name, year prefix, and prefix–year mapping</p>
+                </div>
+                <div class="utils-grid">
+                    <div class="card util-card">
+                        <h3 class="card-title">Extract base name</h3>
+                        <p class="card-description">Get base variable name (strip year prefix)</p>
+                        <input type="text" id="util-extract-input" class="filter-select" placeholder="e.g. R1AGE">
+                        <button class="btn-primary mt-4" onclick="utilExtractBaseName()">Extract</button>
+                        <div id="util-extract-result" class="util-result"></div>
+                    </div>
+                    <div class="card util-card">
+                        <h3 class="card-title">Construct variable name</h3>
+                        <p class="card-description">Build variable name from base name and year</p>
+                        <input type="text" id="util-construct-base" class="filter-select" placeholder="Base name">
+                        <input type="number" id="util-construct-year" class="filter-select" placeholder="Year (e.g. 2020)" min="1992" max="2022">
+                        <button class="btn-primary mt-4" onclick="utilConstructName()">Construct</button>
+                        <div id="util-construct-result" class="util-result"></div>
+                    </div>
+                    <div class="card util-card">
+                        <h3 class="card-title">Year → prefix</h3>
+                        <p class="card-description">Get prefix for a wave year</p>
+                        <input type="number" id="util-prefix-year" class="filter-select" placeholder="Year">
+                        <button class="btn-primary mt-4" onclick="utilYearPrefix()">Get prefix</button>
+                        <div id="util-prefix-result" class="util-result"></div>
+                    </div>
+                    <div class="card util-card">
+                        <h3 class="card-title">Prefix → year</h3>
+                        <p class="card-description">Get year for a prefix</p>
+                        <input type="text" id="util-year-prefix" class="filter-select" placeholder="Prefix (e.g. R, Q)">
+                        <button class="btn-primary mt-4" onclick="utilPrefixYear()">Get year</button>
+                        <div id="util-year-result" class="util-result"></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
+    <!-- Codebook detail modal (sections + variables for core and exit) -->
+    <div id="codebook-detail-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="codebook-detail-title">
+        <div class="modal-content codebook-detail-modal-content">
+            <div class="modal-header">
+                <h2 id="codebook-detail-title" class="codebook-detail-title"></h2>
+                <button type="button" class="close" onclick="closeCodebookDetailModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="codebook-detail-tabs">
+                <button type="button" class="codebook-detail-tab active" data-cb-tab="sections" onclick="setCodebookDetailTab('sections')">Sections</button>
+                <button type="button" class="codebook-detail-tab" data-cb-tab="variables" onclick="setCodebookDetailTab('variables')">Variables</button>
+            </div>
+            <div id="codebook-detail-sections" class="codebook-detail-content">
+                <div class="loading">Loading sections...</div>
+            </div>
+            <div id="codebook-detail-variables" class="codebook-detail-content" style="display: none;">
+                <div class="loading">Loading variables...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Variable Detail Modal -->
-    <div id="variable-modal" class="modal">
+    <div id="variable-modal" class="modal" role="dialog" aria-modal="true">
         <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
+            <div class="modal-header modal-header-close-only">
+                <button type="button" class="close" onclick="closeModal()" aria-label="Close">&times;</button>
+            </div>
             <div id="variable-detail"></div>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="/static/app.js"></script>
+    <!-- Scripts (modular load order) -->
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/tabs.js"></script>
+    <script src="/static/js/filters.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/codebooks.js"></script>
+    <script src="/static/js/exit.js"></script>
+    <script src="/static/js/categorization.js"></script>
+    <script src="/static/js/search.js"></script>
+    <script src="/static/js/sections.js"></script>
+    <script src="/static/js/modal.js"></script>
+    <script src="/static/js/utilities.js"></script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>
