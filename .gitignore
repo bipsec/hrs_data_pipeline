@@ -53,15 +53,13 @@ Thumbs.db
 data/*
 report/*
 
+DATA.md
+.cursor/*
 dummy.ipynb
+
 scripts/
 src/api/README.md
 src/database/README.md
 src/database/example_usage.py
-src/discovery/discover_codebooks.py
 src/fetch/client.py
 src/fetch/fetch_sources.py
-src/models/exits.py
-src/parse/parse_html_codebook.py
-src/parse/parse_pdf_codebook.py
-src/parse/parse_txt_codebook.py
