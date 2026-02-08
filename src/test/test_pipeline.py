@@ -8,7 +8,16 @@ from typing import Dict, Any
 
 from src.parse.parse_txt_codebook import parse_txt_codebook, _extract_year_from_filename
 from src.parse.parse_codebooks import find_codebook_files
-from src.parse.models import Codebook, Variable, Section, VariableLevel, VariableType
+from src.models.cores import (
+    Codebook,
+    CodebookLegacy,
+    CodebookModern,
+    Variable,
+    Section,
+    VariableLevel,
+    VariableType,
+    CoreDataPeriod,
+)
 from src.database.mongodb_client import MongoDBClient, load_dotenv
 from src.database.load_codebooks import (
     load_codebook_to_mongodb,
@@ -51,6 +60,8 @@ VAR2                          Variable 2 Description
     
     assert codebook.source == "test_source"
     assert codebook.year == 2020
+    assert codebook.core_period == CoreDataPeriod.MODERN
+    assert isinstance(codebook, CodebookModern)
     assert codebook.total_variables >= 0
     assert isinstance(codebook.sections, list)
 
@@ -72,6 +83,18 @@ def test_find_codebook_files(tmp_path: Path):
     codebook_file.write_text("test content")
     
     files = find_codebook_files(data_dir, year=2020)
+    assert len(files) > 0
+    assert codebook_file in files
+
+
+def test_find_codebook_files_2006_style(tmp_path: Path):
+    """Test finding codebook when folder/file use 2-digit year (e.g. 2006 -> h06cb/h06cb.txt)."""
+    data_dir = tmp_path / "data"
+    hrs_data = data_dir / "HRS Data" / "2006" / "Core" / "h06cb"
+    hrs_data.mkdir(parents=True)
+    codebook_file = hrs_data / "h06cb.txt"
+    codebook_file.write_text("test content")
+    files = find_codebook_files(data_dir, year=2006)
     assert len(files) > 0
     assert codebook_file in files
 
@@ -271,34 +294,47 @@ def api_client():
 
 @pytest.fixture
 def mock_mongodb_client():
-    """Create a mock MongoDB client for API tests."""
-    with patch('src.api.app.get_mongodb_client') as mock_get_client:
-        mock_client = MagicMock()
-        mock_get_client.return_value.__enter__.return_value = mock_client
-        mock_get_client.return_value.__exit__.return_value = None
-        
-        # Setup default mock collections
-        mock_codebooks_collection = MagicMock()
-        mock_sections_collection = MagicMock()
-        mock_index_collection = MagicMock()
-        
-        def get_collection_side_effect(name):
-            if name == "codebooks":
-                return mock_codebooks_collection
-            elif name == "sections":
-                return mock_sections_collection
-            elif name == "variables_index":
-                return mock_index_collection
-            return MagicMock()
-        
-        mock_client.get_collection.side_effect = get_collection_side_effect
-        
+    """Create a mock MongoDB client for API tests (patch get_mongodb_client in each route module)."""
+    mock_get_client = MagicMock()
+    mock_client = MagicMock()
+    mock_get_client.return_value.__enter__.return_value = mock_client
+    mock_get_client.return_value.__exit__.return_value = None
+
+    mock_codebooks_collection = MagicMock()
+    mock_sections_collection = MagicMock()
+    mock_index_collection = MagicMock()
+
+    def get_collection_side_effect(name):
+        if name == "codebooks":
+            return mock_codebooks_collection
+        if name == "sections":
+            return mock_sections_collection
+        if name == "variables_index":
+            return mock_index_collection
+        return MagicMock()
+
+    mock_client.get_collection.side_effect = get_collection_side_effect
+
+    patchers = [
+        patch("src.api.routes.general.get_mongodb_client", mock_get_client),
+        patch("src.api.routes.codebooks.get_mongodb_client", mock_get_client),
+        patch("src.api.routes.variables.get_mongodb_client", mock_get_client),
+        patch("src.api.routes.sections.get_mongodb_client", mock_get_client),
+        patch("src.api.routes.search.get_mongodb_client", mock_get_client),
+        patch("src.api.routes.categorizer.get_mongodb_client", mock_get_client),
+    ]
+    for p in patchers:
+        p.start()
+    try:
         yield {
             "client": mock_client,
             "codebooks": mock_codebooks_collection,
             "sections": mock_sections_collection,
             "index": mock_index_collection,
         }
+    finally:
+        for p in patchers:
+            p.stop()
 
 
 def test_api_root_endpoint(api_client, mock_mongodb_client):
@@ -542,3 +578,87 @@ def test_api_variable_detail(api_client, mock_mongodb_client):
     data = response.json()
     assert data["name"] == "VAR1"
     assert data["year"] == 2020
+
+
+def test_api_categorization_endpoint(api_client, mock_mongodb_client):
+    """Test categorization endpoint returns by_section, by_level, special categories."""
+    mocks = mock_mongodb_client
+
+    mocks["codebooks"].find.return_value = [
+        {
+            "year": 2020,
+            "variables": [
+                {
+                    "name": "HHID",
+                    "section": "A",
+                    "level": "Household",
+                    "type": "String",
+                    "has_value_codes": False,
+                    "is_identifier": True,
+                    "is_derived": False,
+                },
+                {
+                    "name": "R1AGE",
+                    "section": "A",
+                    "level": "Respondent",
+                    "type": "Numeric",
+                    "has_value_codes": False,
+                    "is_identifier": False,
+                    "is_derived": False,
+                },
+            ],
+        }
+    ]
+
+    response = api_client.get("/categorization?year=2020")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "by_section" in data
+    assert "by_level" in data
+    assert "by_type" in data
+    assert "special_categories" in data
+    sc = data["special_categories"]
+    assert "identifiers" in sc
+    assert "derived" in sc
+    assert "with_value_codes" in sc
+    assert "years_covered" in data
+    assert data["total_variables"] == 2
+    assert data["total_years"] == 1
+    assert 2020 in data["years_covered"]
+    assert sc["identifiers"]["count"] >= 1
+    assert "HHID" in sc["identifiers"]["variable_names"]
+
+
+def test_api_categorization_sections_route(api_client, mock_mongodb_client):
+    """Test GET /categorization/sections returns sections only."""
+    mocks = mock_mongodb_client
+    mocks["codebooks"].find.return_value = [
+        {
+            "year": 2020,
+            "variables": [
+                {"name": "V1", "section": "A", "level": "R", "type": "Numeric"},
+            ],
+        }
+    ]
+    response = api_client.get("/categorization/sections?year=2020")
+    assert response.status_code == 200
+    data = response.json()
+    assert "sections" in data
+    assert "A" in data["sections"]
+    assert data["sections"]["A"]["count"] >= 1
+
+
+def test_api_categorization_special_route(api_client, mock_mongodb_client):
+    """Test GET /categorization/special returns special categories only."""
+    mocks = mock_mongodb_client
+    mocks["codebooks"].find.return_value = [
+        {"year": 2020, "variables": [{"name": "HHID", "section": "A", "level": "H", "type": "String", "is_identifier": True}]},
+    ]
+    response = api_client.get("/categorization/special?year=2020")
+    assert response.status_code == 200
+    data = response.json()
+    assert "identifiers" in data
+    assert "derived" in data
+    assert "with_value_codes" in data
+    assert data["identifiers"]["count"] >= 1
