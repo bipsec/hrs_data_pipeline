@@ -1,12 +1,17 @@
-"""API route modules."""
+"""API route modules (modular: core, exit, shared)."""
 
-from .general import router as general_router
-from .codebooks import router as codebooks_router
-from .variables import router as variables_router
-from .sections import router as sections_router
-from .search import router as search_router
-from .utilities import router as utilities_router
-from .categorizer import router as categorizer_router
+from .core import (
+    codebooks_router,
+    variables_router,
+    sections_router,
+    search_router,
+)
+from .exit import exit_router
+from .shared import (
+    general_router,
+    utilities_router,
+    categorizer_router,
+)
 
 __all__ = [
     "general_router",
@@ -16,4 +21,5 @@ __all__ = [
     "search_router",
     "utilities_router",
     "categorizer_router",
+    "exit_router",
 ]
