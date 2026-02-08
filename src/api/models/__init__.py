@@ -16,6 +16,13 @@ from .responses import (
     ByTypeResponse,
     ByBaseNameResponse,
     CategorizationResponse,
+    EXIT_SOURCE,
+    ExitValueCodeResponse,
+    ExitVariableSummary,
+    ExitVariableDetail,
+    ExitSectionResponse,
+    ExitCodebookSummary,
+    ExitSearchResponse,
 )
 
 __all__ = [
@@ -34,4 +41,11 @@ __all__ = [
     "ByTypeResponse",
     "ByBaseNameResponse",
     "CategorizationResponse",
+    "EXIT_SOURCE",
+    "ExitValueCodeResponse",
+    "ExitVariableSummary",
+    "ExitVariableDetail",
+    "ExitSectionResponse",
+    "ExitCodebookSummary",
+    "ExitSearchResponse",
 ]

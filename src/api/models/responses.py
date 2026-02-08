@@ -1,6 +1,6 @@
 """API response/summary models for HRS pipeline."""
 
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from ...models.cores import (
@@ -139,3 +139,69 @@ class CategorizationResponse(BaseModel):
     total_variables: int = 0
     total_years: int = 0
     years_covered: List[int] = Field(default_factory=list)
+
+
+# --- Exit codebook API response models ---
+
+EXIT_SOURCE = "hrs_exit_codebook"
+
+
+class ExitValueCodeResponse(BaseModel):
+    """Value code for an exit variable."""
+    code: str
+    frequency: Optional[int] = None
+    label: Optional[str] = None
+    is_missing: bool = False
+
+
+class ExitVariableSummary(BaseModel):
+    """Summary of an exit variable for list/search results."""
+    name: str
+    year: int
+    section: str
+    level: str
+    description: str
+    type: str
+
+
+class ExitVariableDetail(BaseModel):
+    """Full exit variable details."""
+    name: str
+    year: int
+    section: str
+    level: str
+    description: str
+    type: str
+    width: int = 0
+    decimals: int = 0
+    value_codes: List[ExitValueCodeResponse] = Field(default_factory=list)
+    has_value_codes: bool = False
+    notes: Optional[str] = None
+
+
+class ExitSectionResponse(BaseModel):
+    """Exit section response."""
+    code: str
+    name: str
+    level: str
+    year: int
+    variable_count: int
+    variables: List[str]
+
+
+class ExitCodebookSummary(BaseModel):
+    """Exit codebook summary response."""
+    source: str = EXIT_SOURCE
+    year: int
+    release_type: Optional[str] = None
+    total_variables: int
+    total_sections: int
+    levels: List[str]
+
+
+class ExitSearchResponse(BaseModel):
+    """Exit variable search response."""
+    query: str
+    total: int
+    results: List[ExitVariableSummary]
+    limit: int
