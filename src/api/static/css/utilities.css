@@ -1,0 +1,51 @@
+/* HRS Data Pipeline - Utilities page */
+
+.utils-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-6);
+}
+
+.util-card { padding: var(--space-6); }
+
+.util-card .card-title {
+  font-size: 1.125rem;
+  margin-bottom: var(--space-2);
+}
+
+.util-card .card-description {
+  font-size: 0.875rem;
+  margin-bottom: var(--space-4);
+}
+
+.util-card input {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.util-card input[type="number"] { margin-bottom: var(--space-2); }
+
+.util-result {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-height: 2rem;
+}
+
+.util-success {
+  background: var(--neutral-50);
+  border-left: 4px solid var(--accent-500);
+  color: var(--neutral-800);
+}
+
+.util-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: var(--space-2);
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .utils-grid { grid-template-columns: 1fr; }
+}

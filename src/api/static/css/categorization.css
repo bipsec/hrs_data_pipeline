@@ -1,0 +1,426 @@
+/* HRS Data Pipeline - Categorization page (Year, Source, Period, View by) */
+/* Uses fallbacks so panel looks correct even if base.css loads late or fails */
+
+#categorization .cat-panel {
+  --cat-space-2: 0.5rem;
+  --cat-space-3: 0.75rem;
+  --cat-space-4: 1rem;
+  --cat-space-5: 1.25rem;
+  --cat-space-6: 1.5rem;
+  --cat-space-8: 2rem;
+  --cat-neutral-50: #fafafa;
+  --cat-neutral-200: #e5e5e5;
+  --cat-neutral-500: #737373;
+  --cat-neutral-800: #262626;
+  --cat-primary-300: #93c5fd;
+  --cat-primary-500: #3b82f6;
+  --cat-primary-600: #2563eb;
+  --cat-primary-700: #1e40af;
+  --cat-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #fff;
+  border-radius: 20px;
+  padding: var(--space-8, var(--cat-space-8, 2rem));
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--neutral-200, var(--cat-neutral-200));
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+/* Filters: Year, Source, Period */
+#categorization .cat-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6, 1.5rem);
+  align-items: flex-end;
+  margin-bottom: var(--space-8, 2rem);
+  padding-bottom: var(--space-6, 1.5rem);
+  border-bottom: 1px solid var(--neutral-200, #e5e5e5);
+}
+
+#categorization .cat-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  min-width: 140px;
+  flex: 0 1 auto;
+}
+
+#categorization .cat-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-500, var(--cat-neutral-500));
+}
+
+#categorization .cat-filter-select {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--neutral-200, #e5e5e5);
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  font-family: var(--font-sans, var(--cat-font-sans));
+  background: var(--neutral-50, #fafafa);
+  color: var(--neutral-800, #262626);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-width: 140px;
+}
+
+#categorization .cat-filter-select:hover {
+  border-color: var(--primary-300, #93c5fd);
+  background: #fff;
+}
+
+#categorization .cat-filter-select:focus {
+  outline: none;
+  border-color: var(--primary-500, #3b82f6);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+/* View by section */
+#categorization .cat-view-section {
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+#categorization .cat-view-heading {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-500, #737373);
+  margin-bottom: var(--space-4, 1rem);
+}
+
+#categorization .cat-view-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-4, 1rem);
+}
+
+/* View option cards (Full, By Section, etc.) */
+#categorization .cat-view-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 0.75rem;
+  background: var(--neutral-50, #fafafa);
+  border: 2px solid var(--neutral-200, #e5e5e5);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, background 0.2s;
+  font-family: var(--font-sans, var(--cat-font-sans));
+  text-align: center;
+  min-height: 100px;
+}
+
+#categorization .cat-view-card:hover {
+  border-color: var(--primary-300, #93c5fd);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.08);
+  transform: translateY(-2px);
+}
+
+#categorization .cat-view-card:focus {
+  outline: none;
+  border-color: var(--primary-500, #3b82f6);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+#categorization .cat-view-card.active {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  border-color: #2563eb;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+}
+
+#categorization .cat-view-card.active:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.3);
+}
+
+#categorization .cat-view-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 1.25rem;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--primary-600, #2563eb);
+}
+
+#categorization .cat-view-card.active .cat-view-icon {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+#categorization .cat-view-label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--neutral-800, #262626);
+  line-height: 1.2;
+}
+
+#categorization .cat-view-card.active .cat-view-label {
+  color: #fff;
+}
+
+#categorization .cat-view-desc {
+  font-size: 0.6875rem;
+  color: var(--neutral-500, #737373);
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#categorization .cat-view-card.active .cat-view-desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Load button */
+#categorization .cat-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-4, 1rem);
+}
+
+#categorization .btn-cat-load {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-sans, var(--cat-font-sans));
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+#categorization .btn-cat-load:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+#categorization .btn-cat-load:active {
+  transform: translateY(0);
+}
+
+/* Content area (rendered results inside #categorization-content) */
+#categorization .categorization-content {
+  margin-top: 1.5rem;
+  min-height: 200px;
+}
+
+#categorization .cat-summary {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  color: #525252;
+  font-weight: 500;
+}
+
+#categorization .cat-cards {
+  margin-top: 1rem;
+}
+
+#categorization .cat-card .card-description {
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+#categorization .cat-details {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+#categorization .cat-details summary {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+#categorization .variable-names-list {
+  margin-top: 0.5rem;
+  color: #525252;
+  word-break: break-word;
+}
+
+#categorization .cat-full-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+#categorization .stat-inline {
+  padding: 1rem 1.5rem;
+  min-width: 120px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+}
+
+#categorization .stat-inline .stat-value {
+  font-size: 1.5rem;
+  color: #1e40af;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+#categorization .stat-inline .stat-label {
+  color: #525252;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#categorization .cat-full-sections h3,
+#categorization .cat-full-sections + .cards-grid + h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  color: #262626;
+}
+
+/* Cards and grid inside categorization-content (fallbacks if components.css missing) */
+#categorization .categorization-content .cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+#categorization .categorization-content .card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e5e5;
+}
+
+#categorization .categorization-content .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+#categorization .categorization-content .card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #171717;
+}
+
+#categorization .categorization-content .badge-primary {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+#categorization .categorization-content .card-description {
+  color: #525252;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+
+#categorization .categorization-content .card-meta {
+  font-size: 0.875rem;
+  color: #525252;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e5e5;
+}
+
+#categorization .categorization-content .meta-label {
+  font-weight: 600;
+  color: #404040;
+}
+
+#categorization .categorization-content .empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #737373;
+}
+
+#categorization .categorization-content .loading {
+  text-align: center;
+  padding: 3rem;
+  color: #737373;
+  font-size: 1.125rem;
+}
+
+#categorization .categorization-content .error {
+  background: #fee;
+  color: #c33;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #c33;
+}
+
+/* Responsive: Year, Source, Period stack; View by grid collapses */
+@media (max-width: 1024px) {
+  #categorization .cat-view-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  #categorization .cat-panel {
+    padding: 1.25rem;
+  }
+
+  #categorization .cat-filters-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  #categorization .cat-filter-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #categorization .cat-filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  #categorization .cat-view-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  #categorization .cat-view-card {
+    min-height: 88px;
+    padding: 1rem 0.75rem;
+  }
+
+  #categorization .cat-view-desc {
+    display: none;
+  }
+
+  #categorization .cat-actions {
+    justify-content: stretch;
+  }
+
+  #categorization .btn-cat-load {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  #categorization .cat-view-grid {
+    grid-template-columns: 1fr;
+  }
+}
