@@ -5,11 +5,14 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from src.config_loader import get_years_for_source
+
 from .parse_txt_codebook import parse_txt_codebook
 from .parse_early_1992_1994 import parse_and_merge_early_codebook
-from .save_codebook import save_codebook_json, save_cross_year_catalog
+from .parse_exit_codebook import parse_exit_codebook, parse_and_merge_exit_codebook
+from .save_codebook import save_codebook_json, save_exit_codebook_json
 from src.models.cores import (
-    CrossYearVariableCatalog, 
+    CrossYearVariableCatalog,
     VariableTemporalMapping,
     extract_base_name,
     get_year_prefix,
@@ -73,6 +76,57 @@ def find_codebook_files(data_dir: Path, year: Optional[int] = None) -> List[Path
                         break
     
     return sorted(codebooks)
+
+
+def find_exit_codebook_files(
+    data_dir: Path,
+    year: Optional[int] = None,
+) -> List[Path]:
+    """Find exit codebook files. Uses years from config/sources.yaml (hrs_exit_codebook).
+
+    Looks under data_dir / 'HRS Data' / {year} / 'Exit' / x{yy}cb/ for:
+    - Single combined file: x{year}cb.txt (e.g. x2022cb.txt) or x{yy}cb.txt (e.g. x96cb.txt)
+    - Otherwise all *.txt in that directory.
+    If no .txt there, looks for .htm/.html under Exit or raw/exit.
+    data_dir is resolved to absolute so relative paths work when run from any cwd.
+    """
+    base = data_dir.resolve()
+    years = get_years_for_source("hrs_exit_codebook")
+    if year is not None:
+        years = [y for y in years if y == year]
+    codebooks: List[Path] = []
+    for y in years:
+        yy = y % 100
+        exit_dir = base / "HRS Data" / str(y) / "Exit"
+        # Prefer x{yy}cb (e.g. x95cb); also check x{year}cb (e.g. x1995cb) for 4-digit naming
+        xcb_dir = exit_dir / f"x{yy:02d}cb"
+        xcb_dir_4 = exit_dir / f"x{y}cb"
+        found: List[Path] = []
+        for cand_dir in (xcb_dir, xcb_dir_4):
+            if not cand_dir.exists():
+                continue
+            combined_4 = cand_dir / f"x{y}cb.txt"
+            combined_2 = cand_dir / f"x{yy:02d}cb.txt"
+            if combined_4.exists():
+                found = [combined_4]
+                break
+            if combined_2.exists():
+                found = [combined_2]
+                break
+            txts = sorted(f for f in cand_dir.glob("*.txt") if f.is_file())
+            if txts:
+                found = txts
+                break
+        if found:
+            codebooks.extend(found)
+        else:
+            for fallback in (exit_dir, base / "raw" / "exit" / str(y), base / "Exit" / str(y)):
+                if not fallback.exists():
+                    continue
+                for f in fallback.rglob("*"):
+                    if f.is_file() and f.suffix.lower() in (".htm", ".html"):
+                        codebooks.append(f)
+    return sorted(set(codebooks))
 
 
 def _year_from_path(path: Path) -> Optional[int]:
@@ -178,17 +232,48 @@ def main():
         "--source",
         type=str,
         default="hrs_core_codebook",
-        help="Source identifier for codebooks",
+        help="Source identifier (e.g. hrs_core_codebook, hrs_exit_codebook from config/sources.yaml)",
     )
     parser.add_argument(
         "--build-catalog",
         action="store_true",
-        help="Build cross-year variable catalog",
+        help="Build cross-year variable catalog (core only)",
     )
     
     args = parser.parse_args()
     
-    # Find codebook files
+    # Exit codebook: use config years and find files under data/HRS Data/{year}/Exit/x{yy}cb/*.txt
+    if args.source == "hrs_exit_codebook":
+        print(f"Searching for exit codebook files in: {args.data_dir}")
+        codebook_files = find_exit_codebook_files(args.data_dir, args.year)
+        if not codebook_files:
+            print("No exit codebook files found. Place .txt under data/HRS Data/{year}/Exit/x{yy}cb/ (e.g. x20cb/x2020cb.txt)")
+            sys.exit(1)
+        exit_by_year = {}
+        for p in codebook_files:
+            y = _year_from_path(p)
+            if y is None and len(p.parts) >= 2 and p.parts[-2].isdigit():
+                y = int(p.parts[-2])
+            if y is not None:
+                exit_by_year.setdefault(y, []).append(p)
+        for year, paths in sorted(exit_by_year.items()):
+            try:
+                if len(paths) == 1:
+                    print(f"\nParsing: {paths[0]}")
+                    codebook = parse_exit_codebook(paths[0], source=args.source, year=year)
+                else:
+                    print(f"\nParsing {len(paths)} files for {year} (merge)")
+                    codebook = parse_and_merge_exit_codebook(paths, year=year, source=args.source)
+                out = save_exit_codebook_json(codebook, args.output_dir)
+                print(f"  Parsed {codebook.total_variables} variables in {codebook.total_sections} sections; saved to {out}")
+            except Exception as e:
+                print(f"  ERROR: {e}")
+                import traceback
+                traceback.print_exc()
+        print("\n[OK] Exit codebook parsing complete.")
+        return
+    
+    # Core codebook
     print(f"Searching for codebook files in: {args.data_dir}")
     codebook_files = find_codebook_files(args.data_dir, args.year)
     
@@ -196,7 +281,6 @@ def main():
         print("No codebook files found!")
         sys.exit(1)
     
-    # Group by year (1992/1994 have multiple files per year)
     year_groups = group_codebook_files_by_year(codebook_files)
     print(f"Found {sum(len(p) for _, p in year_groups)} file(s) across {len(year_groups)} year(s)")
     
@@ -222,7 +306,6 @@ def main():
             traceback.print_exc()
             continue
     
-    # Build cross-year catalog if requested
     if args.build_catalog and parsed_codebooks:
         print("\nBuilding cross-year variable catalog...")
         catalog = build_cross_year_catalog(parsed_codebooks)

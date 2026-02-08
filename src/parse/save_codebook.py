@@ -2,10 +2,10 @@
 
 import json
 from pathlib import Path
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Union
 
 from src.models.cores import Codebook, CrossYearVariableCatalog, VariableTemporalMapping
+from src.models.exits import ExitCodebook
 
 
 def save_codebook_json(
@@ -86,6 +86,60 @@ def save_codebook_json(
         )
     
     return codebook_file
+
+
+def save_exit_codebook_json(
+    codebook: ExitCodebook,
+    output_dir: Path,
+    pretty: bool = True,
+) -> Path:
+    """Save an exit codebook to structured JSON (same layout as core: output_dir/source/year/)."""
+    output_path = output_dir / codebook.source / str(codebook.year)
+    output_path.mkdir(parents=True, exist_ok=True)
+    codebook_file = output_path / f"codebook_{codebook.year}.json"
+    with open(codebook_file, "w", encoding="utf-8") as f:
+        json.dump(
+            codebook.model_dump(mode="json"),
+            f,
+            indent=2 if pretty else None,
+            ensure_ascii=False,
+            default=str,
+        )
+    sections_dir = output_path / "sections"
+    sections_dir.mkdir(exist_ok=True)
+    for section in codebook.sections:
+        section_vars = [v for v in codebook.variables if v.section == section.code]
+        section_data = {
+            "section": section.model_dump(mode="json"),
+            "variables": [v.model_dump(mode="json") for v in section_vars],
+        }
+        section_file = sections_dir / f"section_{section.code}.json"
+        with open(section_file, "w", encoding="utf-8") as f:
+            json.dump(section_data, f, indent=2 if pretty else None, ensure_ascii=False, default=str)
+    variables_index = {
+        "year": codebook.year,
+        "source": codebook.source,
+        "total_variables": codebook.total_variables,
+        "variables": [
+            {"name": v.name, "section": v.section, "level": v.level.value, "description": v.description, "type": v.type.value}
+            for v in codebook.variables
+        ],
+    }
+    index_file = output_path / "variables_index.json"
+    with open(index_file, "w", encoding="utf-8") as f:
+        json.dump(variables_index, f, indent=2 if pretty else None, ensure_ascii=False)
+    return codebook_file
+
+
+def save_codebook_any(
+    codebook: Union[Codebook, ExitCodebook],
+    output_dir: Path,
+    pretty: bool = True,
+) -> Path:
+    """Save either a core Codebook or an ExitCodebook to JSON."""
+    if isinstance(codebook, ExitCodebook):
+        return save_exit_codebook_json(codebook, output_dir, pretty)
+    return save_codebook_json(codebook, output_dir, pretty)
 
 
 def save_cross_year_catalog(
