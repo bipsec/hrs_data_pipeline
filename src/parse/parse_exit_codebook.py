@@ -20,7 +20,7 @@ from src.models.exits import (
 
 
 def _extract_year_from_path(path: Path) -> Optional[int]:
-    """Extract year from path or filename (e.g. x95cb -> 1995, x96... -> 1996, x2020cb -> 2020)."""
+    """Extract year from path or filename (e.g. x95cb -> 1995, x00cb -> from path, x2020cb -> 2020)."""
     stem = path.stem
     m = re.search(r"(?:h|x)(\d{2,4})", stem, re.I)
     if m:
@@ -28,8 +28,10 @@ def _extract_year_from_path(path: Path) -> Optional[int]:
         if y < 100:
             if y == 95:
                 return 1995
-            return 1996 + (y - 96) // 2 * 2 if y >= 96 else None
-        if 1990 <= y <= 2030:
+            if y >= 96:
+                return 1996 + (y - 96) // 2 * 2
+            # yy in 00--95 (e.g. x00cb = 2000): resolve from path
+        elif 1990 <= y <= 2030:
             return y
     for part in path.parts:
         if part.isdigit() and len(part) == 4 and 1990 <= int(part) <= 2030:
@@ -427,3 +429,139 @@ def parse_and_merge_exit_codebook(
         metadata={"file_paths": [str(p) for p in paths]},
         parsed_at=datetime.now(),
     )
+
+
+def _find_exit_codebook_files_cli(data_dir: Path, year: Optional[int] = None) -> List[Path]:
+    """Find exit codebook files under data_dir (no config dependency)."""
+    base = Path(data_dir).resolve()
+    hrs_data = base / "HRS Data"
+    if not hrs_data.exists():
+        return []
+    years: List[int] = []
+    if year is not None:
+        years = [year]
+    else:
+        for d in hrs_data.iterdir():
+            if d.is_dir() and d.name.isdigit() and 1990 <= int(d.name) <= 2030:
+                years.append(int(d.name))
+    years = sorted(years)
+    codebooks: List[Path] = []
+    for y in years:
+        exit_dir = hrs_data / str(y) / "Exit"
+        yy = y % 100
+        found: List[Path] = []
+        for cand_dir in (exit_dir / f"x{yy:02d}cb", exit_dir / f"x{y}cb", exit_dir):
+            if not cand_dir.exists():
+                continue
+            for pattern in (f"x{y}cb.txt", f"x{yy:02d}cb.txt"):
+                p = cand_dir / pattern
+                if p.exists():
+                    found = [p]
+                    break
+            if not found:
+                txts = sorted(cand_dir.glob("*.txt"))
+                if txts:
+                    found = txts
+            if not found:
+                for ext in ("*.htm", "*.html"):
+                    found = sorted(cand_dir.glob(ext))
+                    found = [f for f in found if f.is_file()]
+                    if found:
+                        break
+            if found:
+                codebooks.extend(found)
+                break
+    seen: set = set()
+    out: List[Path] = []
+    for p in sorted(codebooks):
+        key = p.resolve()
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+    return out
+
+
+def main() -> None:
+    """CLI: parse exit codebook(s) and save to JSON."""
+    import argparse
+    import sys
+
+    from .save_codebook import save_exit_codebook_json
+
+    parser = argparse.ArgumentParser(
+        description="Parse HRS exit codebook files and save to JSON",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
+        help="Directory containing HRS Data folder",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("data") / "parsed",
+        help="Output directory for parsed JSON",
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        help="Process only this year (default: all years under data-dir)",
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default="hrs_exit_codebook",
+        help="Source identifier",
+    )
+    args = parser.parse_args()
+
+    files = _find_exit_codebook_files_cli(args.data_dir, args.year)
+    if not files:
+        print(
+            "No exit codebook files found. Expect data/HRS Data/{year}/Exit/x{yy}cb/*.txt or .htm/.html",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Group by year for merge (year from filename or from path, e.g. .../2000/Exit/x00cb/...)
+    by_year: Dict[int, List[Path]] = {}
+    for p in files:
+        y = _extract_year_from_path(p)
+        if y is None:
+            # Walk up to find year folder (e.g. .../HRS Data/2000/Exit/x00cb/x00cb.txt)
+            parent = p.parent
+            while parent != parent.parent:
+                if parent.name.isdigit() and len(parent.name) == 4:
+                    try:
+                        yi = int(parent.name)
+                        if 1990 <= yi <= 2030:
+                            y = yi
+                            break
+                    except ValueError:
+                        pass
+                parent = parent.parent
+        if y is not None:
+            by_year.setdefault(y, []).append(p)
+
+    for y, paths in sorted(by_year.items()):
+        try:
+            if len(paths) == 1:
+                print(f"Parsing: {paths[0]}")
+                codebook = parse_exit_codebook(paths[0], source=args.source, year=y)
+            else:
+                print(f"Parsing {len(paths)} files for {y} (merge)")
+                codebook = parse_and_merge_exit_codebook(paths, year=y, source=args.source)
+            out = save_exit_codebook_json(codebook, args.output_dir)
+            print(f"  Saved {codebook.total_variables} variables, {codebook.total_sections} sections -> {out}")
+        except Exception as e:
+            print(f"  ERROR: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()
