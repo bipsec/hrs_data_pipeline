@@ -22,8 +22,9 @@ hrs_data_pipeline/
 │   │   ├── save_codebook.py      # JSON save utilities
 │   │   └── ...
 │   ├── database/                 # MongoDB integration
-│   │   ├── mongodb_client.py     # MongoDB connection
-│   │   └── load_codebooks.py     # Data loading script
+│   │   ├── mongodb_client.py              # MongoDB connection
+│   │   ├── load_codebooks.py              # Load to local MongoDB
+│   │   └── load_codebook_to_mongodb_atlas.py  # Load to MongoDB Atlas (uses .env)
 │   ├── api/                      # FastAPI application
 │   │   ├── routes/
 │   │   │   ├── core/             # codebooks, variables, sections, search
@@ -103,8 +104,12 @@ Configure the MongoDB Compass locally to store the parsed data.
 Load parsed codebooks into MongoDB:
 
 ```bash
-# Load all codebooks
+# Load all codebooks locally
 python -m src.database.load_codebooks
+
+# load all codebooks into MongoDB Cloud
+python -m src.database.load_codebook_to_mongodb_atlas
+
 
 # Load specific source (core or exit)
 python -m src.database.load_codebooks --source hrs_core_codebook
@@ -116,6 +121,26 @@ python -m src.database.load_codebooks --year 2020
 # Create indexes for better performance
 python -m src.database.load_codebooks --create-indexes
 ```
+
+### Loading into MongoDB Atlas
+
+Load codebooks to MongoDB Atlas using credentials from `.env` (no credentials in the command line):
+
+```bash
+# Load all codebooks to Atlas
+python -m src.database.load_codebook_to_mongodb_atlas
+
+# Load only exit codebooks
+python -m src.database.load_codebook_to_mongodb_atlas --exit-only
+
+# Load specific source or year
+python -m src.database.load_codebook_to_mongodb_atlas --source hrs_exit_codebook --year 2020
+
+# Create indexes after load
+python -m src.database.load_codebook_to_mongodb_atlas --create-indexes
+```
+
+**Required in `.env`:** `MONGODB_USER`, `MONGODB_PASSWORD`. Optional: `MONGODB_DB` (default `hrs_data`), `MONGODB_ATLAS_CLUSTER` (e.g. `cluster0.xxxx.mongodb.net`). If `MONGODB_ATLAS_CLUSTER` is not set, the cluster host is taken from `MONGODB_ATLAS_CONNECTION_STRING`.
 
 **MongoDB Setup:**
 
