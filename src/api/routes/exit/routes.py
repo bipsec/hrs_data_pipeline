@@ -117,7 +117,7 @@ async def get_exit_variables(
     source: str = Query(EXIT_SOURCE, description="Source name"),
     section: Optional[str] = Query(None, description="Filter by section code"),
     level: Optional[str] = Query(None, description="Filter by level"),
-    limit: int = Query(100, ge=1, le=1000, description="Max results"),
+    limit: int = Query(500, ge=1, le=2000, description="Max results"),
 ):
     """List exit variables with optional filters."""
     with get_mongodb_client() as client:

@@ -7,6 +7,7 @@ from .core import (
     search_router,
 )
 from .exit import exit_router
+from .post_exit import post_exit_router
 from .shared import (
     general_router,
     utilities_router,
@@ -22,4 +23,5 @@ __all__ = [
     "utilities_router",
     "categorizer_router",
     "exit_router",
+    "post_exit_router",
 ]
