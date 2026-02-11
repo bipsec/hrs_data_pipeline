@@ -1,5 +1,9 @@
-# Render Blueprint – deploy from GitHub. Set MONGODB_CONNECTION_STRING (Atlas URI) in Dashboard.
+# Render Blueprint – deploy from GitHub. Set MongoDB credentials in Dashboard (Environment).
 # Uses native Python build (no Docker); full repo is available at build time.
+#
+# Option A – full URI (recommended): set MONGODB_CONNECTION_STRING (sync: false).
+# Option B – Atlas parts (matches load_codebook_to_mongodb_atlas): set MONGODB_USER,
+#   MONGODB_PASSWORD, and either MONGODB_ATLAS_CLUSTER or MONGODB_ATLAS_CONNECTION_STRING.
 services:
   - type: web
     name: hrs-data-pipeline
@@ -9,7 +13,20 @@ services:
     startCommand: uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /years
     envVars:
+      # Option A: full Atlas URI (set in Dashboard as secret)
+      - key: MONGODB_CONNECTION_STRING
+        sync: false
+      # Option B: Atlas credentials (set in Dashboard; API builds URI from these)
+      - key: MONGODB_USER
+        sync: false
+      - key: MONGODB_PASSWORD
+        sync: false
+      - key: MONGODB_ATLAS_CLUSTER
+        sync: false
       - key: MONGODB_ATLAS_CONNECTION_STRING
         sync: false
+      # Database name (optional; default hrs_data)
+      - key: MONGODB_DATABASE_NAME
+        value: hrs_data
       - key: MONGODB_DB
         value: hrs_data

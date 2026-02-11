@@ -1,6 +1,8 @@
 """MongoDB client for connecting and managing database operations."""
 
 import os
+import re
+import urllib.parse
 from pathlib import Path
 from typing import Optional, Dict
 from pymongo import MongoClient
@@ -58,22 +60,37 @@ class MongoDBClient:
             project_root = Path(__file__).parent.parent.parent
             dotenv_path = project_root / ".env"
         
-        # Load environment variables
         env_vars = load_dotenv(dotenv_path)
-        
-        # Get connection string from parameter, env var, or .env file
-        self.connection_string = (
+
+        def _get(key: str, env_default: Optional[str] = None) -> Optional[str]:
+            return os.getenv(key) or env_vars.get(key) or env_vars.get(key.lower()) or env_default
+
+        # Connection string: explicit, or build from Atlas parts (same as load_codebook_to_mongodb_atlas)
+        full_uri = (
             connection_string
-            or os.getenv("MONGODB_CONNECTION_STRING")
-            or env_vars.get("MONGODB_CONNECTION_STRING")
-            or "mongodb://localhost:27017/"
+            or _get("MONGODB_CONNECTION_STRING")
         )
-        
-        # Get database name from parameter, env var, or .env file
+        if full_uri:
+            self.connection_string = full_uri
+        else:
+            user = _get("MONGODB_USER")
+            pwd = _get("MONGODB_PASSWORD")
+            cluster = _get("MONGODB_ATLAS_CLUSTER")
+            if not cluster and _get("MONGODB_ATLAS_CONNECTION_STRING"):
+                match = re.search(r"@([^/]+)", _get("MONGODB_ATLAS_CONNECTION_STRING") or "")
+                if match:
+                    cluster = match.group(1).rstrip("/")
+            if user and pwd and cluster:
+                encoded = urllib.parse.quote_plus(pwd)
+                self.connection_string = f"mongodb+srv://{user}:{encoded}@{cluster}/"
+            else:
+                self.connection_string = "mongodb://localhost:27017/"
+
+        # Database name: parameter, env, or default (MONGODB_DB or MONGODB_DATABASE_NAME)
         self.database_name = (
             database_name
-            or os.getenv("MONGODB_DATABASE_NAME")
-            or env_vars.get("MONGODB_DATABASE_NAME")
+            or _get("MONGODB_DATABASE_NAME")
+            or _get("MONGODB_DB")
             or "hrs_data"
         )
         
