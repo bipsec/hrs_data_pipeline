@@ -93,7 +93,7 @@ sources:
     description: "Human Resources Survey (HRS) Core Imputations Codebook"
 
   - name: "hrs_post_exit_codebook"
-    type: "html"
+    type: "txt"
     pattern_group: "post_exit_codebook"
     years: [1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
     starting_year: 1998
