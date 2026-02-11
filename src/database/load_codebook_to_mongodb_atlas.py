@@ -9,6 +9,7 @@ from .mongodb_client import MongoDBClient, load_dotenv
 from .load_codebooks import (
     load_all_codebooks,
     load_exit_codebooks,
+    load_post_exit_codebooks,
     create_indexes,
 )
 
@@ -97,6 +98,11 @@ def main() -> None:
         action="store_true",
         help="Load only exit codebooks (hrs_exit_codebook)",
     )
+    parser.add_argument(
+        "--post-exit-only",
+        action="store_true",
+        help="Load only post-exit codebooks (hrs_post_exit_codebook)",
+    )
     args = parser.parse_args()
 
     print("Using MongoDB Atlas (credentials from .env)")
@@ -119,6 +125,15 @@ def main() -> None:
             )
             print("=" * 60)
             print(f"Loaded {n} exit codebook(s)")
+            print(f"Database: {client.database_name}")
+        elif args.post_exit_only:
+            n = load_post_exit_codebooks(
+                args.parsed_dir,
+                client,
+                year_filter=args.year,
+            )
+            print("=" * 60)
+            print(f"Loaded {n} post-exit codebook(s)")
             print(f"Database: {client.database_name}")
         else:
             load_all_codebooks(
