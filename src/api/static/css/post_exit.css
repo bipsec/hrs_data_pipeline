@@ -1,0 +1,193 @@
+/* HRS Data Pipeline - Post Exit codebook section (reuses exit layout with distinct accent) */
+
+#post-exit .post-exit-header {
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+#post-exit .post-exit-header .section-description {
+  color: var(--neutral-600, #4b5563);
+  max-width: 56ch;
+}
+
+.post-exit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-6, 1.5rem);
+  padding: var(--space-4, 1rem);
+  background: var(--neutral-50, #f9fafb);
+  border-radius: 12px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+}
+
+.post-exit-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+.post-exit-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  flex: 1;
+  min-width: 200px;
+}
+
+.post-exit-search-row .post-exit-search-input {
+  flex: 1;
+  max-width: 360px;
+}
+
+.post-exit-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5, 1.25rem);
+  margin-bottom: var(--space-8, 2rem);
+}
+
+.post-exit-card {
+  border-left: 4px solid var(--accent-500, #10b981);
+}
+
+.post-exit-badge {
+  display: inline-block;
+  padding: 0.2em 0.5em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, var(--accent-500, #10b981), var(--accent-600, #059669));
+  color: white;
+  border-radius: 6px;
+}
+
+.post-exit-detail-panel .detail-panel-header .btn-secondary.btn-sm {
+  padding: var(--space-3) var(--space-6);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-300);
+  background: var(--neutral-100);
+  color: var(--neutral-800);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.post-exit-detail-panel .detail-panel-header .btn-secondary.btn-sm:hover {
+  background: var(--neutral-200);
+  border-color: var(--neutral-400);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.post-exit-detail-panel .detail-panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  width: fit-content;
+}
+
+.post-exit-detail-panel .detail-panel-tab {
+  padding: var(--space-3) var(--space-6);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--neutral-600);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.post-exit-detail-panel .detail-panel-tab:hover {
+  background: var(--neutral-100);
+  color: var(--neutral-900);
+  border-color: var(--neutral-300);
+}
+
+.post-exit-detail-panel .detail-panel-tab.active {
+  padding: var(--space-3) var(--space-6);
+  background: linear-gradient(135deg, var(--accent-600, #059669), var(--accent-500, #10b981));
+  color: white;
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.post-exit-detail-panel .detail-panel-tab.active:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.post-exit-section-card:hover {
+  border-color: var(--accent-400, #34d399);
+}
+
+.exit-section-card-level {
+  font-size: 0.75rem;
+  color: var(--neutral-500);
+  font-weight: 500;
+}
+
+.post-exit-section-card.exit-section-card-selected {
+  border-color: var(--accent-500, #10b981);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.exit-variables-filter-bar {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.exit-variables-filter-label {
+  font-size: 0.875rem;
+  color: var(--neutral-600);
+}
+
+.exit-show-all-vars-btn {
+  font-size: 0.875rem;
+  color: var(--accent-600, #059669);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.exit-show-all-vars-btn:hover {
+  color: var(--accent-700, #047857);
+}
+
+.post-exit-variable-card:hover {
+  border-color: var(--accent-400, #34d399);
+}
+
+.post-exit-variable-card-name {
+  color: var(--accent-700, #047857);
+}
+
+.variable-detail-badge.post-exit-detail-badge {
+  display: inline-block;
+  margin-bottom: var(--space-2, 0.5rem);
+  padding: 0.2em 0.6em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, var(--accent-500, #10b981), var(--accent-600, #059669));
+  color: white;
+  border-radius: 6px;
+}
+
+.post-exit-search-results {
+  margin-top: var(--space-6, 1.5rem);
+  padding: var(--space-4, 1rem);
+  background: var(--neutral-50, #f9fafb);
+  border-radius: 12px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+}

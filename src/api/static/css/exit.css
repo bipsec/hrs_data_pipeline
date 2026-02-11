@@ -308,6 +308,44 @@
   margin-top: var(--space-1);
 }
 
+.exit-section-card-level {
+  font-size: 0.75rem;
+  color: var(--neutral-500);
+  font-weight: 500;
+}
+
+.exit-section-card.exit-section-card-selected {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.exit-variables-filter-bar {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.exit-variables-filter-label {
+  font-size: 0.875rem;
+  color: var(--neutral-600);
+}
+
+.exit-show-all-vars-btn {
+  font-size: 0.875rem;
+  color: var(--primary-600);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.exit-show-all-vars-btn:hover {
+  color: var(--primary-700);
+}
+
 /* Variables grid */
 .exit-variables-wrap {
   padding: var(--space-2) 0;

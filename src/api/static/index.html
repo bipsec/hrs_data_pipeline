@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/css/categorization.css">
     <link rel="stylesheet" href="/static/css/exit.css">
+    <link rel="stylesheet" href="/static/css/post_exit.css">
 </head>
 <body>
     <!-- Header -->
@@ -72,6 +73,7 @@
                 <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
                 <button class="tab" data-tab="codebooks" role="tab" aria-selected="false">Codebooks</button>
                 <button class="tab" data-tab="exit" role="tab" aria-selected="false">Exit</button>
+                <button class="tab" data-tab="post-exit" role="tab" aria-selected="false">Post Exit</button>
                 <button class="tab" data-tab="categorization" role="tab" aria-selected="false">Categorization</button>
                 <button class="tab" data-tab="search" role="tab" aria-selected="false">Search Variables</button>
                 <button class="tab" data-tab="sections" role="tab" aria-selected="false">Sections</button>
@@ -187,6 +189,52 @@
                 <div id="exit-search-results" class="exit-search-results" style="display: none;">
                     <h3>Search results</h3>
                     <div id="exit-search-results-list"></div>
+                </div>
+            </div>
+
+            <!-- Post Exit Codebooks Section -->
+            <div id="post-exit" class="content-section" role="tabpanel">
+                <div class="section-header post-exit-header">
+                    <h2>Post Exit Codebooks</h2>
+                    <p class="section-description">Post-exit questionnaire variables (1998–2022). Click a codebook to view sections and variables below.</p>
+                </div>
+                <div class="post-exit-toolbar">
+                    <div class="post-exit-filters">
+                        <select id="post-exit-year-filter" class="filter-select" aria-label="Post exit codebook year">
+                            <option value="">All Years</option>
+                        </select>
+                        <button type="button" class="btn-primary" onclick="loadPostExitCodebooks()">Load Post Exit Codebooks</button>
+                    </div>
+                    <div class="post-exit-search-row">
+                        <input type="text" id="post-exit-search-input" class="search-input post-exit-search-input" placeholder="Search post-exit variables by name or description..." aria-label="Search post-exit variables">
+                        <button type="button" class="search-button" onclick="searchPostExitVariables()">Search Post Exit</button>
+                    </div>
+                </div>
+                <div id="post-exit-codebooks-list" class="post-exit-cards-grid exit-cards-grid">
+                    <div class="empty-state">Select a year (or All Years) and click "Load Post Exit Codebooks" to view post-exit codebooks</div>
+                </div>
+                <div id="post-exit-detail-panel" class="detail-panel exit-detail-panel post-exit-detail-panel" style="display: none;">
+                    <div class="detail-panel-header">
+                        <div class="exit-detail-header-main">
+                            <h3 id="post-exit-detail-title">Post exit codebook <span id="post-exit-detail-year"></span></h3>
+                            <p id="post-exit-detail-summary" class="exit-detail-summary" style="display: none;"></p>
+                        </div>
+                        <button type="button" class="btn-secondary btn-sm" onclick="closePostExitDetail()" aria-label="Close">Close</button>
+                    </div>
+                    <div class="detail-panel-tabs">
+                        <button type="button" class="detail-panel-tab active" data-detail-tab="sections" onclick="setPostExitDetailTab('sections')">Sections</button>
+                        <button type="button" class="detail-panel-tab" data-detail-tab="variables" onclick="setPostExitDetailTab('variables')">Variables</button>
+                    </div>
+                    <div id="post-exit-sections-content" class="detail-panel-content">
+                        <div class="loading">Load a codebook to see sections</div>
+                    </div>
+                    <div id="post-exit-variables-content" class="detail-panel-content" style="display: none;">
+                        <div class="loading">Load a codebook to see variables</div>
+                    </div>
+                </div>
+                <div id="post-exit-search-results" class="exit-search-results post-exit-search-results" style="display: none;">
+                    <h3>Search results</h3>
+                    <div id="post-exit-search-results-list"></div>
                 </div>
             </div>
 
@@ -393,6 +441,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/codebooks.js"></script>
     <script src="/static/js/exit.js"></script>
+    <script src="/static/js/post_exit.js"></script>
     <script src="/static/js/categorization.js"></script>
     <script src="/static/js/search.js"></script>
     <script src="/static/js/sections.js"></script>

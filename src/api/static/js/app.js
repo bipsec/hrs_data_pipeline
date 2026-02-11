@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeSearch();
   initCategorizationSubnav();
   if (typeof initExitSearchInput === 'function') initExitSearchInput();
+  if (typeof initPostExitSearchInput === 'function') initPostExitSearchInput();
   loadDashboard();
   loadYearFilters();
   loadSourceFilters();

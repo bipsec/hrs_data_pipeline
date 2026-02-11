@@ -3,7 +3,7 @@
 async function loadYearFilters() {
   try {
     const data = await apiCall('/years');
-    const filterIds = ['codebook-year-filter', 'search-year-filter', 'section-year-filter', 'cat-year-filter', 'exit-year-filter'];
+    const filterIds = ['codebook-year-filter', 'search-year-filter', 'section-year-filter', 'cat-year-filter', 'exit-year-filter', 'post-exit-year-filter'];
     filterIds.forEach((id) => {
       const select = document.getElementById(id);
       if (select && data.years) {

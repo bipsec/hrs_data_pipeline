@@ -158,8 +158,8 @@ async function viewExitVariableModal(name, year) {
             ${variable.value_codes
               .map(
                 (vc) => `
-              <div class="value-code-item">
-                <strong>${escapeHtml(String(vc.code))}</strong>${vc.frequency != null ? ` (${Number(vc.frequency).toLocaleString()})` : ''}
+              <div class="value-code-item${vc.is_missing ? ' value-code-missing' : ''}">
+                <strong>${escapeHtml(String(vc.code))}</strong>${vc.frequency != null ? ` (${Number(vc.frequency).toLocaleString()})` : ''}${vc.is_missing ? ' <span class="value-code-missing-badge">Missing</span>' : ''}
                 ${vc.label ? `<div class="value-label">${escapeHtml(vc.label)}</div>` : ''}
               </div>
             `
@@ -172,6 +172,73 @@ async function viewExitVariableModal(name, year) {
   } catch (error) {
     console.error('Error loading exit variable:', error);
     detail.innerHTML = `<div class="error">Failed to load exit variable: ${error.message}</div>`;
+  }
+}
+
+async function viewPostExitVariableModal(name, year) {
+  const modal = document.getElementById('variable-modal');
+  const detail = document.getElementById('variable-detail');
+  if (!modal || !detail) return;
+
+  const y = Number(year);
+  if (!Number.isFinite(y) || y < 1998 || y > 2030) {
+    alert('Post-exit variable details require a valid year (1998–2022).');
+    return;
+  }
+
+  detail.innerHTML = '<div class="loading">Loading post-exit variable...</div>';
+  modal.classList.add('is-open');
+  modal.style.display = '';
+
+  try {
+    const variable = await apiCall(`/post-exit/variables/${encodeURIComponent(name)}?year=${year}`);
+
+    detail.innerHTML = `
+      <div class="variable-detail-badge post-exit-detail-badge">Post-exit variable</div>
+      <h2>${escapeHtml(variable.name)}</h2>
+      <div class="variable-detail-section">
+        <div class="detail-row">
+          <span class="detail-label">Description:</span>
+          <span>${escapeHtml(variable.description || 'No description')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Year:</span>
+          <span>${variable.year}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Section:</span>
+          <span>${escapeHtml(variable.section || 'N/A')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Level:</span>
+          <span>${escapeHtml(variable.level || 'N/A')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Type:</span>
+          <span>${escapeHtml(variable.type || 'N/A')} (Width: ${variable.width ?? 'N/A'}, Decimals: ${variable.decimals ?? 'N/A'})</span>
+        </div>
+      </div>
+      ${variable.value_codes && variable.value_codes.length > 0 ? `
+        <div class="value-codes-section">
+          <h3>Value Codes</h3>
+          <div class="value-codes-list">
+            ${variable.value_codes
+              .map(
+                (vc) => `
+              <div class="value-code-item${vc.is_missing ? ' value-code-missing' : ''}">
+                <strong>${escapeHtml(String(vc.code))}</strong>${vc.frequency != null ? ` (${Number(vc.frequency).toLocaleString()})` : ''}${vc.is_missing ? ' <span class="value-code-missing-badge">Missing</span>' : ''}
+                ${vc.label ? `<div class="value-label">${escapeHtml(vc.label)}</div>` : ''}
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+  } catch (error) {
+    console.error('Error loading post-exit variable:', error);
+    detail.innerHTML = `<div class="error">Failed to load post-exit variable: ${error.message}</div>`;
   }
 }
 
@@ -190,6 +257,8 @@ window.onclick = function (event) {
   else if (event.target === codebookModal && typeof closeCodebookDetailModal === 'function') closeCodebookDetailModal();
 };
 
+window.viewVariable = viewVariable;
 window.viewVariableFromSearch = viewVariableFromSearch;
 window.viewExitVariableModal = viewExitVariableModal;
+window.viewPostExitVariableModal = viewPostExitVariableModal;
 window.closeModal = closeModal;

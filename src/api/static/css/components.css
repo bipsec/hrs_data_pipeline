@@ -723,6 +723,20 @@
   font-size: 0.9375rem;
 }
 
+.value-code-item.value-code-missing {
+  border-left-color: var(--neutral-400);
+  color: var(--neutral-600);
+}
+
+.value-code-missing-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--neutral-500);
+  margin-left: var(--space-2);
+}
+
 .value-label {
   margin-top: var(--space-1);
   color: var(--neutral-600);

@@ -4,6 +4,7 @@ var EXIT_VARIABLES_BATCH = 48;
 var _exitVariablesCache = [];
 var _exitVariablesShown = 0;
 var _exitVariablesYear = null;
+var _exitSectionFilter = null; // { code, level } or null for all
 
 async function loadExitCodebooks() {
   var yearEl = document.getElementById('exit-year-filter');
@@ -62,12 +63,15 @@ async function loadExitCodebooks() {
   }
 }
 
-function buildSectionCard(s) {
+function buildExitSectionCard(s, selected) {
   var count = s.variable_count != null ? s.variable_count : 0;
+  var levelAttr = s.level ? escapeAttr(String(s.level)) : '';
+  var sel = selected ? ' exit-section-card-selected' : '';
   return (
-    '<div class="exit-section-card" role="button" tabindex="0">' +
+    '<div class="exit-section-card' + sel + '" role="button" tabindex="0" data-section="' + escapeAttr(s.code) + '" data-level="' + levelAttr + '">' +
     '<span class="exit-section-card-code">' + escapeHtml(s.code) + '</span>' +
     '<span class="exit-section-card-name">' + escapeHtml(s.name) + '</span>' +
+    (s.level ? '<span class="exit-section-card-level">' + escapeHtml(String(s.level)) + '</span>' : '') +
     '<span class="exit-section-card-badge">' + count + ' var' + (count === 1 ? '' : 's') + '</span>' +
     '</div>'
   );
@@ -138,6 +142,107 @@ function closeExitDetail() {
   _exitVariablesCache = [];
   _exitVariablesShown = 0;
   _exitVariablesYear = null;
+  _exitSectionFilter = null;
+}
+
+function loadExitVariablesFromApi(year, sectionCode, level) {
+  var params = new URLSearchParams({ year: String(year), limit: '2000' });
+  if (sectionCode) params.set('section', sectionCode);
+  if (level) params.set('level', level);
+  return apiCall('/exit/variables?' + params.toString());
+}
+
+function fillExitVariablesPanel(year, variables, sectionFilter) {
+  var variablesEl = document.getElementById('exit-variables-content');
+  if (!variablesEl) return;
+  _exitVariablesCache = variables;
+  _exitVariablesShown = 0;
+  _exitVariablesYear = year;
+  _exitSectionFilter = sectionFilter || null;
+
+  if (variables.length === 0) {
+    variablesEl.innerHTML = '<div class="exit-detail-empty">No variables' + (sectionFilter ? ' in this section' : '') + '</div>';
+    return;
+  }
+
+  var topBar = '';
+  if (sectionFilter) {
+    topBar = '<div class="exit-variables-filter-bar"><span class="exit-variables-filter-label">Section ' + escapeHtml(sectionFilter.code) + (sectionFilter.level ? ' \u00b7 ' + escapeHtml(sectionFilter.level) : '') + '</span> <button type="button" class="btn-link exit-show-all-vars-btn" onclick="loadExitAllVariables()">All variables</button></div>';
+  }
+
+  var listInner = document.createElement('div');
+  listInner.className = 'exit-variables-grid';
+  listInner.id = 'exit-variables-list-inner';
+  var initialCount = Math.min(EXIT_VARIABLES_BATCH, variables.length);
+  renderExitVariablesChunk(listInner, variables, year, 0, initialCount);
+  _exitVariablesShown = initialCount;
+
+  var loadMoreWrap = document.createElement('div');
+  loadMoreWrap.className = 'exit-load-more-wrap';
+  loadMoreWrap.id = 'exit-load-more-wrap';
+  if (variables.length > initialCount) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'exit-load-more-btn';
+    btn.textContent = 'Load more (' + (variables.length - initialCount) + ' left)';
+    btn.addEventListener('click', showMoreExitVariables);
+    loadMoreWrap.appendChild(btn);
+  } else {
+    loadMoreWrap.classList.add('is-hidden');
+  }
+
+  var variablesWrap = document.createElement('div');
+  variablesWrap.className = 'exit-variables-wrap';
+  if (topBar) variablesWrap.innerHTML = topBar;
+  variablesWrap.appendChild(listInner);
+  variablesWrap.appendChild(loadMoreWrap);
+  variablesEl.innerHTML = '';
+  variablesEl.appendChild(variablesWrap);
+}
+
+async function viewExitSection(year, sectionCode, level) {
+  var variablesEl = document.getElementById('exit-variables-content');
+  if (variablesEl) variablesEl.innerHTML = '<div class="exit-detail-loading"><div class="exit-detail-loading-spinner"></div><p class="exit-detail-loading-text">Loading section variables\u2026</p></div>';
+  setExitDetailTab('variables');
+  try {
+    var params = new URLSearchParams({ year: String(year), limit: '500' });
+    if (sectionCode) params.set('section', sectionCode);
+    if (level) params.set('level', level);
+    var variables = await apiCall('/exit/variables?' + params.toString());
+    fillExitVariablesPanel(year, variables, sectionCode ? { code: sectionCode, level: level || '' } : null);
+    updateExitSectionSelection(sectionCode ? { code: sectionCode, level: level || '' } : null);
+  } catch (e) {
+    console.error('Error loading exit section variables:', e);
+    if (variablesEl) variablesEl.innerHTML = '<div class="exit-detail-error">' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function loadExitAllVariables() {
+  var year = _exitVariablesYear || (window.currentCodebookDetail && window.currentCodebookDetail.year);
+  if (!year) return;
+  var variablesEl = document.getElementById('exit-variables-content');
+  if (variablesEl) variablesEl.innerHTML = '<div class="exit-detail-loading"><div class="exit-detail-loading-spinner"></div><p class="exit-detail-loading-text">Loading variables\u2026</p></div>';
+  try {
+    var variables = await loadExitVariablesFromApi(year, null, null);
+    fillExitVariablesPanel(year, variables, null);
+    updateExitSectionSelection(null);
+  } catch (e) {
+    console.error('Error loading exit variables:', e);
+    if (variablesEl) variablesEl.innerHTML = '<div class="exit-detail-error">' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function updateExitSectionSelection(sectionFilter) {
+  var sectionsEl = document.getElementById('exit-sections-content');
+  if (!sectionsEl) return;
+  var grid = sectionsEl.querySelector('.exit-sections-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.exit-section-card').forEach(function (card) {
+    var code = card.getAttribute('data-section');
+    var lvl = card.getAttribute('data-level') || '';
+    var selected = sectionFilter && sectionFilter.code === code && String(sectionFilter.level || '') === lvl;
+    card.classList.toggle('exit-section-card-selected', !!selected);
+  });
 }
 
 async function viewExitCodebook(year) {
@@ -170,64 +275,41 @@ async function viewExitCodebook(year) {
 
   try {
     var sectionsPromise = apiCall('/exit/sections?year=' + year);
-    var variablesPromise = apiCall('/exit/variables?year=' + year + '&limit=1000');
+    var variablesPromise = loadExitVariablesFromApi(year, null, null);
     var results = await Promise.all([sectionsPromise, variablesPromise]);
     var sections = results[0];
     var variables = results[1];
 
-    /* Summary strip */
     if (summaryEl) {
-      summaryEl.textContent = sections.length + ' sections · ' + variables.length + ' variables';
+      summaryEl.textContent = sections.length + ' sections \u00b7 ' + variables.length + ' variables';
       summaryEl.style.display = 'block';
     }
 
-    /* Sections */
     if (sections.length === 0) {
       sectionsEl.innerHTML = '<div class="exit-detail-empty">No sections</div>';
     } else {
       sectionsEl.innerHTML =
         '<div class="exit-sections-wrap">' +
         '<div class="exit-sections-grid">' +
-        sections.map(buildSectionCard).join('') +
+        sections.map(function (s) { return buildExitSectionCard(s, false); }).join('') +
         '</div></div>';
+      sectionsEl.querySelectorAll('.exit-section-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          var code = this.getAttribute('data-section');
+          var lvl = this.getAttribute('data-level') || '';
+          if (!code) return;
+          viewExitSection(year, code, lvl || null);
+        });
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.click();
+          }
+        });
+      });
     }
 
-    /* Variables */
-    _exitVariablesCache = variables;
-    _exitVariablesShown = 0;
-    _exitVariablesYear = year;
-
-    if (variables.length === 0) {
-      variablesEl.innerHTML = '<div class="exit-detail-empty">No variables</div>';
-    } else {
-      var initialCount = Math.min(EXIT_VARIABLES_BATCH, variables.length);
-      var listInner = document.createElement('div');
-      listInner.className = 'exit-variables-grid';
-      listInner.id = 'exit-variables-list-inner';
-      renderExitVariablesChunk(listInner, variables, year, 0, initialCount);
-      _exitVariablesShown = initialCount;
-
-      var loadMoreWrap = document.createElement('div');
-      loadMoreWrap.className = 'exit-load-more-wrap';
-      loadMoreWrap.id = 'exit-load-more-wrap';
-      if (variables.length > initialCount) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'exit-load-more-btn';
-        btn.textContent = 'Load more (' + (variables.length - initialCount) + ' left)';
-        btn.addEventListener('click', showMoreExitVariables);
-        loadMoreWrap.appendChild(btn);
-      } else {
-        loadMoreWrap.classList.add('is-hidden');
-      }
-
-      var variablesWrap = document.createElement('div');
-      variablesWrap.className = 'exit-variables-wrap';
-      variablesWrap.appendChild(listInner);
-      variablesWrap.appendChild(loadMoreWrap);
-      variablesEl.innerHTML = '';
-      variablesEl.appendChild(variablesWrap);
-    }
+    fillExitVariablesPanel(year, variables, null);
   } catch (error) {
     console.error('Error loading exit detail:', error);
     var errHtml = '<div class="exit-detail-error">' + escapeHtml(error.message) + '</div>';
@@ -237,8 +319,10 @@ async function viewExitCodebook(year) {
 }
 
 function viewExitVariable(el) {
-  var name = el && el.getAttribute && el.getAttribute('data-name');
-  var yearAttr = el && el.getAttribute && el.getAttribute('data-year');
+  var card = el && el.closest && el.closest('.exit-variable-card');
+  if (!card) card = el;
+  var name = card && card.getAttribute && card.getAttribute('data-name');
+  var yearAttr = card && card.getAttribute && card.getAttribute('data-year');
   var year = yearAttr != null ? yearAttr : (window.currentCodebookDetail && window.currentCodebookDetail.year);
   if (!name) return;
   var y = parseInt(year, 10);
@@ -319,6 +403,8 @@ function initExitSearchInput() {
 
 window.loadExitCodebooks = loadExitCodebooks;
 window.viewExitCodebook = viewExitCodebook;
+window.viewExitSection = viewExitSection;
+window.loadExitAllVariables = loadExitAllVariables;
 window.setExitDetailTab = setExitDetailTab;
 window.closeExitDetail = closeExitDetail;
 window.searchExitVariables = searchExitVariables;
