@@ -1,0 +1,14 @@
+# Optional: local MongoDB for development (API uses MONGODB_CONNECTION_STRING from .env).
+# Usage: docker compose up -d   then start API with  uv run hrs-dev
+services:
+  mongodb:
+    image: mongo:7
+    container_name: hrs-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - hrs_mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  hrs_mongodb_data:
