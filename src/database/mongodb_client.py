@@ -9,6 +9,19 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
 
+
+import ssl
+import pymongo
+import certifi
+import dns
+
+print("OpenSSL:", ssl.OPENSSL_VERSION)
+print("PyMongo:", pymongo.version)
+print("certifi:", certifi.where())
+print("dnspython:", dns.__version__)
+
+
+
 try:
     import certifi
 except ImportError:
@@ -124,25 +137,29 @@ class MongoDBClient:
     
     def connect(self) -> None:
         """Connect to MongoDB."""
-        # Atlas (mongodb+srv): use certifi CA bundle for TLS
-        kwargs: Dict[str, Any] = {}
-        if "mongodb+srv://" in self.connection_string and certifi is not None:
+        kwargs: Dict[str, Any] = {
+            "serverSelectionTimeoutMS": 30000,
+            "connectTimeoutMS": 20000,
+            "socketTimeoutMS": 20000,
+        }
+
+        # Force TLS CA bundle for Atlas (mongodb.net) if certifi is available
+        if ("mongodb+srv://" in self.connection_string or "mongodb.net" in self.connection_string):
+            if certifi is None:
+                raise RuntimeError(
+                    "certifi is required for TLS connections to MongoDB Atlas. "
+                    "Add certifi to your dependencies."
+                )
             kwargs["tlsCAFile"] = certifi.where()
+
         try:
             self.client = MongoClient(self.connection_string, **kwargs)
-            # Test connection
-            self.client.admin.command('ping')
+            self.client.admin.command("ping")
             self.db = self.client[self.database_name]
             print(f"Connected to MongoDB: {self.database_name}")
         except Exception as e:
-            msg = str(e)
-            if "Connection refused" in msg and ("localhost" in self.connection_string or "127.0.0.1" in self.connection_string):
-                raise ConnectionError(
-                    f"Failed to connect to MongoDB: {e}. "
-                    "To use MongoDB Atlas, set MONGODB_CONNECTION_STRING in .env (or env) to your Atlas URI, "
-                    "e.g. mongodb+srv://user:password@cluster.mongodb.net/"
-                ) from e
             raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
+
     
     def disconnect(self) -> None:
         """Disconnect from MongoDB."""

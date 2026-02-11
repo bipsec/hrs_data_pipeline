@@ -10,7 +10,8 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "pyyaml>=6.0",
-    "pymongo[tls]>=4.6.0",
+    "pymongo[srv]>=4.6",
+    "certifi>=2024.2",
     "pytest",
 ]
 
