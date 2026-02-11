@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from ..database.mongodb_client import get_global_mongo, close_global_mongo
+from .dependencies import get_mongodb_client, close_mongodb_client
 
 from .routes import (
     general_router,
@@ -64,11 +64,11 @@ def main() -> None:
 
 @app.on_event("startup")
 def _startup():
-    get_global_mongo()  # connect once
+    get_mongodb_client()  # connect once
 
 @app.on_event("shutdown")
 def _shutdown():
-    close_global_mongo()
+    close_mongodb_client()
 
 
 
