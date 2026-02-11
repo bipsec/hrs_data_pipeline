@@ -144,6 +144,7 @@ class CategorizationResponse(BaseModel):
 # --- Exit codebook API response models ---
 
 EXIT_SOURCE = "hrs_exit_codebook"
+POST_EXIT_SOURCE = "hrs_post_exit_codebook"
 
 
 class ExitValueCodeResponse(BaseModel):
