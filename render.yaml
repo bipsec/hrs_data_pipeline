@@ -1,0 +1,14 @@
+# Render Blueprint – deploy from GitHub. Set MONGODB_CONNECTION_STRING (Atlas URI) in Dashboard.
+services:
+  - type: web
+    name: hrs-data-pipeline
+    runtime: python
+    plan: free
+    buildCommand: pip install .
+    startCommand: uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /years
+    envVars:
+      - key: MONGODB_CONNECTION_STRING
+        sync: false
+      - key: MONGODB_DATABASE_NAME
+        value: hrs_data
