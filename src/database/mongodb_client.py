@@ -63,13 +63,13 @@ class MongoDBClient:
         env_vars = load_dotenv(dotenv_path)
 
         def _get(key: str, env_default: Optional[str] = None) -> Optional[str]:
-            return os.getenv(key) or env_vars.get(key) or env_vars.get(key.lower()) or env_default
+            raw = os.getenv(key) or env_vars.get(key) or env_vars.get(key.lower()) or env_default
+            return (raw.strip() or None) if raw else None
 
         # Connection string: explicit, or build from Atlas parts (same as load_codebook_to_mongodb_atlas)
         full_uri = (
-            connection_string
-            or _get("MONGODB_CONNECTION_STRING")
-        )
+            (connection_string.strip() or None) if connection_string else None
+        ) or _get("MONGODB_CONNECTION_STRING")
         if full_uri:
             self.connection_string = full_uri
         else:
@@ -85,6 +85,15 @@ class MongoDBClient:
                 self.connection_string = f"mongodb+srv://{user}:{encoded}@{cluster}/"
             else:
                 self.connection_string = "mongodb://localhost:27017/"
+
+        # In hosted environments (e.g. Render), require explicit MongoDB config—do not use localhost
+        if "localhost" in self.connection_string or "127.0.0.1" in self.connection_string:
+            if os.getenv("RENDER") or os.getenv("PORT"):
+                raise ConnectionError(
+                    "MongoDB is set to localhost but this looks like a hosted environment. "
+                    "Set MONGODB_CONNECTION_STRING (Atlas URI) or MONGODB_USER, MONGODB_PASSWORD, "
+                    "and MONGODB_ATLAS_CLUSTER in your environment (e.g. Render Dashboard → Environment)."
+                )
 
         # Database name: parameter, env, or default (MONGODB_DB or MONGODB_DATABASE_NAME)
         self.database_name = (
@@ -107,7 +116,14 @@ class MongoDBClient:
             self.db = self.client[self.database_name]
             print(f"Connected to MongoDB: {self.database_name}")
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to MongoDB: {e}")
+            msg = str(e)
+            if "Connection refused" in msg and ("localhost" in self.connection_string or "127.0.0.1" in self.connection_string):
+                raise ConnectionError(
+                    f"Failed to connect to MongoDB: {e}. "
+                    "To use MongoDB Atlas, set MONGODB_CONNECTION_STRING in .env (or env) to your Atlas URI, "
+                    "e.g. mongodb+srv://user:password@cluster.mongodb.net/"
+                ) from e
+            raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
     
     def disconnect(self) -> None:
         """Disconnect from MongoDB."""
