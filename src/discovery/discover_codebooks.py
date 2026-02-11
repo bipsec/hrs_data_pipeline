@@ -1,4 +1,10 @@
-"""Discover and categorize variables from parsed codebooks according to their models."""
+"""Discover and categorize variables from parsed codebooks according to their models.
+
+Supports:
+- hrs_core_codebook: core variable model (section, level, type, base name, year prefix)
+- hrs_exit_codebook: exit variable model (section, level, type, value_codes; no core prefix)
+- hrs_post_exit_codebook: post-exit variable model (same as exit)
+"""
 
 import json
 from pathlib import Path
@@ -10,6 +16,12 @@ from ..models.cores import (
     Variable, VariableLevel, VariableType, Codebook,
     extract_base_name, get_year_prefix, HRS_YEARS, HRS_SECTION_CODES
 )
+
+# Sources that use exit-like variable structure (section, level, type, has_value_codes; no core prefix)
+EXIT_POST_EXIT_SOURCES = frozenset({"hrs_exit_codebook", "hrs_post_exit_codebook"})
+
+# Variable names treated as identifiers for exit/post-exit
+EXIT_IDENTIFIER_NAMES = frozenset({"HHID", "PN", "OPN"})
 
 
 @dataclass
@@ -201,27 +213,177 @@ def categorize_variable(var_data: Dict[str, Any], year: int, categorization: Var
         categorization.no_prefix.levels.add(level)
 
 
+def extract_base_name_exit_like(var_name: str, source: str) -> str:
+    """Extract a base name for exit/post-exit variables (no core year prefix).
+
+    - Post-exit: strip leading XPS (e.g. XPSZ004 -> Z004, XPSVDATE -> VDATE).
+    - Exit: strip single-letter year prefix if present (e.g. REXDATE -> EXDATE).
+    """
+    if not var_name:
+        return var_name
+    if source == "hrs_post_exit_codebook":
+        if var_name.startswith("XPS") and len(var_name) > 3:
+            rest = var_name[3:]
+            if rest and (rest[0].isalnum() or rest[0] == "_"):
+                return rest
+    if source == "hrs_exit_codebook":
+        # Exit uses single letter + name (E, R, F, G, H, ...)
+        if len(var_name) > 1 and var_name[0].isalpha() and var_name[1:].replace("_", "").isalnum():
+            return var_name[1:]
+    return var_name
+
+
+def _level_str_exit(level: Any) -> str:
+    """Normalize level from exit/post-exit variable (may be string or enum value)."""
+    if level is None:
+        return ""
+    if isinstance(level, str):
+        return level
+    return getattr(level, "value", str(level))
+
+
+def categorize_exit_like_variable(
+    var_data: Dict[str, Any],
+    year: int,
+    categorization: VariableCategorization,
+    source: str,
+) -> None:
+    """Categorize a single exit or post-exit variable (section, level, type, value_codes, base name)."""
+    var_name = var_data.get("name", "")
+    section = var_data.get("section", "")
+    level = _level_str_exit(var_data.get("level", ""))
+    var_type = var_data.get("type", "")
+    if hasattr(var_type, "value"):
+        var_type = var_type.value
+    var_type = str(var_type) if var_type else ""
+    has_value_codes = var_data.get("has_value_codes", False)
+    is_identifier = var_name in EXIT_IDENTIFIER_NAMES
+
+    # By section
+    if section:
+        if section not in categorization.by_section:
+            categorization.by_section[section] = VariableCategory(
+                name=f"section_{section}",
+                description=f"Variables in section {section}",
+            )
+        cat = categorization.by_section[section]
+        cat.variable_names.append(var_name)
+        cat.count += 1
+        cat.years.add(year)
+        cat.sections.add(section)
+        cat.levels.add(level)
+
+    # By level
+    if level:
+        if level not in categorization.by_level:
+            categorization.by_level[level] = VariableCategory(
+                name=f"level_{level}",
+                description=f"Variables at {level} level",
+            )
+        cat = categorization.by_level[level]
+        cat.variable_names.append(var_name)
+        cat.count += 1
+        cat.years.add(year)
+        cat.sections.add(section)
+        cat.levels.add(level)
+
+    # By type
+    if var_type:
+        if var_type not in categorization.by_type:
+            categorization.by_type[var_type] = VariableCategory(
+                name=f"type_{var_type}",
+                description=f"{var_type} type variables",
+            )
+        cat = categorization.by_type[var_type]
+        cat.variable_names.append(var_name)
+        cat.count += 1
+        cat.years.add(year)
+        cat.sections.add(section)
+        cat.levels.add(level)
+
+    # By base name (exit/post-exit style)
+    base_name = extract_base_name_exit_like(var_name, source)
+    if base_name not in categorization.by_base_name:
+        categorization.by_base_name[base_name] = VariableCategory(
+            name=f"base_{base_name}",
+            description=f"Variables with base name {base_name}",
+        )
+    cat = categorization.by_base_name[base_name]
+    cat.variable_names.append(var_name)
+    cat.count += 1
+    cat.years.add(year)
+    cat.sections.add(section)
+    cat.levels.add(level)
+
+    # Identifiers
+    if is_identifier:
+        categorization.identifiers.variable_names.append(var_name)
+        categorization.identifiers.count += 1
+        categorization.identifiers.years.add(year)
+        categorization.identifiers.sections.add(section)
+        categorization.identifiers.levels.add(level)
+
+    # Value codes
+    if has_value_codes:
+        categorization.with_value_codes.variable_names.append(var_name)
+        categorization.with_value_codes.count += 1
+        categorization.with_value_codes.years.add(year)
+        categorization.with_value_codes.sections.add(section)
+        categorization.with_value_codes.levels.add(level)
+    else:
+        categorization.without_value_codes.variable_names.append(var_name)
+        categorization.without_value_codes.count += 1
+        categorization.without_value_codes.years.add(year)
+        categorization.without_value_codes.sections.add(section)
+        categorization.without_value_codes.levels.add(level)
+
+    # Exit/post-exit: treat variables with a clear prefix (XPS or single letter) as "prefixed", else no_prefix
+    if source == "hrs_post_exit_codebook" and var_name.startswith("XPS"):
+        categorization.year_prefixed.variable_names.append(var_name)
+        categorization.year_prefixed.count += 1
+        categorization.year_prefixed.years.add(year)
+        categorization.year_prefixed.sections.add(section)
+        categorization.year_prefixed.levels.add(level)
+    elif source == "hrs_exit_codebook" and len(var_name) > 1 and var_name[0].isalpha() and var_name[0].upper() in "ERFGHJKLMNPQSTUVWXYZ":
+        categorization.year_prefixed.variable_names.append(var_name)
+        categorization.year_prefixed.count += 1
+        categorization.year_prefixed.years.add(year)
+        categorization.year_prefixed.sections.add(section)
+        categorization.year_prefixed.levels.add(level)
+    else:
+        categorization.no_prefix.variable_names.append(var_name)
+        categorization.no_prefix.count += 1
+        categorization.no_prefix.years.add(year)
+        categorization.no_prefix.sections.add(section)
+        categorization.no_prefix.levels.add(level)
+
+
 def build_categorization_from_codebooks(
     codebooks: List[Dict[str, Any]],
 ) -> VariableCategorization:
     """Build variable categorization from in-memory codebook dicts (e.g. from MongoDB).
 
     Args:
-        codebooks: List of codebook documents, each with 'year' and 'variables' (list of var dicts).
+        codebooks: List of codebook documents, each with 'year', 'source', and 'variables' (list of var dicts).
 
     Returns:
         VariableCategorization with by_section, by_level, by_type, special categories, etc.
+    Supports core (hrs_core_codebook), exit (hrs_exit_codebook), and post-exit (hrs_post_exit_codebook).
     """
     categorization = VariableCategorization()
     for codebook_data in codebooks:
         year = codebook_data.get("year")
         if year is None:
             continue
+        source = codebook_data.get("source", "hrs_core_codebook")
         categorization.years_covered.add(year)
         categorization.total_years = len(categorization.years_covered)
         variables = codebook_data.get("variables", [])
         for var_data in variables:
-            categorize_variable(var_data, year, categorization)
+            if source in EXIT_POST_EXIT_SOURCES:
+                categorize_exit_like_variable(var_data, year, categorization, source)
+            else:
+                categorize_variable(var_data, year, categorization)
             categorization.total_variables += 1
     return categorization
 
@@ -277,12 +439,16 @@ def discover_codebooks(
         categorization.total_years = len(categorization.years_covered)
         
         variables = codebook_data.get("variables", [])
-        print(f"Processing {year}: {len(variables)} variables")
-        
+        cb_source = codebook_data.get("source", source)
+        print(f"Processing {year} ({cb_source}): {len(variables)} variables")
+
         for var_data in variables:
-            categorize_variable(var_data, year, categorization)
+            if cb_source in EXIT_POST_EXIT_SOURCES:
+                categorize_exit_like_variable(var_data, year, categorization, cb_source)
+            else:
+                categorize_variable(var_data, year, categorization)
             categorization.total_variables += 1
-    
+
     return categorization
 
 
@@ -443,7 +609,7 @@ if __name__ == "__main__":
         "--source",
         type=str,
         default="hrs_core_codebook",
-        help="Source identifier (e.g., 'hrs_core_codebook')"
+        help="Source identifier: hrs_core_codebook, hrs_exit_codebook, or hrs_post_exit_codebook"
     )
     parser.add_argument(
         "--year",
