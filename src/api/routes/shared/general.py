@@ -48,45 +48,45 @@ async def root():
 @router.get("/years", response_model=YearsResponse)
 async def get_years():
     """Get list of available years and sources."""
-    with get_mongodb_client() as client:
-        collection = client.get_collection("codebooks")
-        years = sorted(collection.distinct("year"))
-        sources = sorted(collection.distinct("source"))
-        return YearsResponse(
-            years=years,
-            sources=sources,
-            hrs_years=sorted(list(HRS_YEARS)),
-            hrs_legacy_years=sorted(list(HRS_LEGACY_YEARS)),
-            hrs_modern_years=sorted(list(HRS_MODERN_YEARS)),
-            year_prefix_map=dict(YEAR_PREFIX_MAP),
-        )
+    client = get_mongodb_client()
+    collection = client.get_collection("codebooks")
+    years = sorted(collection.distinct("year"))
+    sources = sorted(collection.distinct("source"))
+    return YearsResponse(
+        years=years,
+        sources=sources,
+        hrs_years=sorted(list(HRS_YEARS)),
+        hrs_legacy_years=sorted(list(HRS_LEGACY_YEARS)),
+        hrs_modern_years=sorted(list(HRS_MODERN_YEARS)),
+        year_prefix_map=dict(YEAR_PREFIX_MAP),
+    )
 
 
 @router.get("/stats")
 async def get_stats():
     """Get statistics about the database."""
-    with get_mongodb_client() as client:
-        codebooks_collection = client.get_collection("codebooks")
-        sections_collection = client.get_collection("sections")
-        index_collection = client.get_collection("variables_index")
-        total_codebooks = codebooks_collection.count_documents({})
-        total_sections = sections_collection.count_documents({})
-        total_indexes = index_collection.count_documents({})
-        codebooks = list(codebooks_collection.find({}, {"total_variables": 1}))
-        total_variables = sum(cb.get("total_variables", 0) for cb in codebooks)
-        years = sorted(codebooks_collection.distinct("year"))
-        year_range = f"{min(years)}-{max(years)}" if years else "N/A"
-        return {
-            "total_codebooks": total_codebooks,
-            "total_sections": total_sections,
-            "total_variables": total_variables,
-            "total_indexes": total_indexes,
-            "year_range": year_range,
-            "years": years,
-            "sources": sorted(codebooks_collection.distinct("source")),
-            "hrs_years_supported": sorted(list(HRS_YEARS)),
-            "section_codes": sorted(list(HRS_SECTION_CODES)),
-        }
+    client = get_mongodb_client()
+    codebooks_collection = client.get_collection("codebooks")
+    sections_collection = client.get_collection("sections")
+    index_collection = client.get_collection("variables_index")
+    total_codebooks = codebooks_collection.count_documents({})
+    total_sections = sections_collection.count_documents({})
+    total_indexes = index_collection.count_documents({})
+    codebooks = list(codebooks_collection.find({}, {"total_variables": 1}))
+    total_variables = sum(cb.get("total_variables", 0) for cb in codebooks)
+    years = sorted(codebooks_collection.distinct("year"))
+    year_range = f"{min(years)}-{max(years)}" if years else "N/A"
+    return {
+        "total_codebooks": total_codebooks,
+        "total_sections": total_sections,
+        "total_variables": total_variables,
+        "total_indexes": total_indexes,
+        "year_range": year_range,
+        "years": years,
+        "sources": sorted(codebooks_collection.distinct("source")),
+        "hrs_years_supported": sorted(list(HRS_YEARS)),
+        "section_codes": sorted(list(HRS_SECTION_CODES)),
+    }
 
 
 @router.get("/waves", response_model=List[WaveInfo])

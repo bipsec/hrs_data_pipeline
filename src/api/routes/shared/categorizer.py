@@ -71,20 +71,20 @@ async def _fetch_categorization(
     core_period: Optional[str] = None,
 ) -> VariableCategorization:
     """Fetch codebooks from MongoDB and build categorization. Raises 404 if no codebooks."""
-    with get_mongodb_client() as client:
-        collection = client.get_collection("codebooks")
-        query: Dict[str, Any] = {}
-        if year is not None:
-            query["year"] = year
-        elif core_period:
-            cp = core_period.lower()
-            if cp == "legacy":
-                query["year"] = {"$in": sorted(HRS_LEGACY_YEARS)}
-            elif cp == "modern":
-                query["year"] = {"$in": sorted(HRS_MODERN_YEARS)}
-        if source:
-            query["source"] = source
-        codebooks = list(collection.find(query, {"year": 1, "source": 1, "variables": 1}))
+    client = get_mongodb_client()
+    collection = client.get_collection("codebooks")
+    query: Dict[str, Any] = {}
+    if year is not None:
+        query["year"] = year
+    elif core_period:
+        cp = core_period.lower()
+        if cp == "legacy":
+            query["year"] = {"$in": sorted(HRS_LEGACY_YEARS)}
+        elif cp == "modern":
+            query["year"] = {"$in": sorted(HRS_MODERN_YEARS)}
+    if source:
+        query["source"] = source
+    codebooks = list(collection.find(query, {"year": 1, "source": 1, "variables": 1}))
     if not codebooks:
         raise HTTPException(status_code=404, detail="No codebooks found for the given filters")
     return build_categorization_from_codebooks(codebooks)
