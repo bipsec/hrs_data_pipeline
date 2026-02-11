@@ -2,6 +2,7 @@
 
 import os
 import re
+import ssl
 import urllib.parse
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -13,6 +14,16 @@ try:
     import certifi
 except ImportError:
     certifi = None  # type: ignore[assignment]
+
+
+def _atlas_ssl_context() -> Optional[ssl.SSLContext]:
+    """Build an SSL context for MongoDB Atlas: certifi CA bundle + TLS 1.2 minimum."""
+    if certifi is None:
+        return None
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    if hasattr(ssl, "TLSVersion"):
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # type: ignore[attr-defined]
+    return ctx
 
 
 def load_dotenv(dotenv_path: Path) -> Dict[str, str]:
@@ -124,10 +135,14 @@ class MongoDBClient:
     
     def connect(self) -> None:
         """Connect to MongoDB."""
-        # Use certifi CA bundle for Atlas (mongodb+srv) to avoid SSL handshake errors
+        # Atlas (mongodb+srv): use custom SSL context (certifi + TLS 1.2+) to avoid TLSV1_ALERT_INTERNAL_ERROR
         kwargs: Dict[str, Any] = {}
-        if "mongodb+srv://" in self.connection_string and certifi is not None:
-            kwargs["tlsCAFile"] = certifi.where()
+        if "mongodb+srv://" in self.connection_string:
+            ctx = _atlas_ssl_context()
+            if ctx is not None:
+                kwargs["ssl_context"] = ctx
+            elif certifi is not None:
+                kwargs["tlsCAFile"] = certifi.where()
         try:
             self.client = MongoClient(self.connection_string, **kwargs)
             # Test connection
