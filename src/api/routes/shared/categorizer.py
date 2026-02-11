@@ -84,7 +84,7 @@ async def _fetch_categorization(
                 query["year"] = {"$in": sorted(HRS_MODERN_YEARS)}
         if source:
             query["source"] = source
-        codebooks = list(collection.find(query, {"year": 1, "variables": 1}))
+        codebooks = list(collection.find(query, {"year": 1, "source": 1, "variables": 1}))
     if not codebooks:
         raise HTTPException(status_code=404, detail="No codebooks found for the given filters")
     return build_categorization_from_codebooks(codebooks)
