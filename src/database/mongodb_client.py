@@ -101,13 +101,23 @@ class MongoDBClient:
                 )
 
         # Database name: parameter, env, or default (MONGODB_DB or MONGODB_DATABASE_NAME)
-        self.database_name = (
-            database_name
-            or _get("MONGODB_DATABASE_NAME")
-            or _get("MONGODB_DB")
-            or "hrs_data"
-        )
-        
+        raw_db = (
+            (database_name.strip() or None) if database_name else None
+        ) or _get("MONGODB_DATABASE_NAME") or _get("MONGODB_DB")
+        # Reject invalid names (e.g. "/" from URI path or typo in env)
+        if not raw_db or raw_db in ("/", "\\") or not raw_db.replace("/", "").replace("\\", "").strip():
+            raw_db = "hrs_data"
+        self.database_name = raw_db
+
+        # If URI path is empty or "/" (e.g. ...@cluster/?options), append database name so PyMongo doesn't use "/"
+        uri = self.connection_string
+        if ("mongodb+srv://" in uri or "mongodb://" in uri) and "/?" in uri:
+            # ...@cluster/?options -> ...@cluster/dbname?options
+            self.connection_string = uri.replace("/?", f"/{self.database_name}?", 1)
+        elif uri.rstrip("/").endswith((".mongodb.net", ".com")) or (uri.endswith("/") and "?" not in uri):
+            # ...@cluster/ or ...@cluster
+            self.connection_string = uri.rstrip("/") + "/" + self.database_name
+
         # Initialize client
         self.client: Optional[MongoClient] = None
         self.db: Optional[Database] = None
