@@ -14,6 +14,7 @@ from .routes import (
     utilities_router,
     categorizer_router,
     exit_router,
+    post_exit_router,
 )
 
 app = FastAPI(
@@ -45,6 +46,7 @@ app.include_router(search_router)
 app.include_router(utilities_router)
 app.include_router(categorizer_router)
 app.include_router(exit_router)
+app.include_router(post_exit_router)
 
 
 if __name__ == "__main__":
