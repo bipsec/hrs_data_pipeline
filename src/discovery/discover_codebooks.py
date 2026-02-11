@@ -358,6 +358,26 @@ def categorize_exit_like_variable(
         categorization.no_prefix.levels.add(level)
 
 
+def process_codebook_into_categorization(
+    codebook_data: Dict[str, Any],
+    categorization: VariableCategorization,
+) -> None:
+    """Process a single codebook document into an existing categorization (streaming-friendly)."""
+    year = codebook_data.get("year")
+    if year is None:
+        return
+    source = codebook_data.get("source", "hrs_core_codebook")
+    categorization.years_covered.add(year)
+    categorization.total_years = len(categorization.years_covered)
+    variables = codebook_data.get("variables", [])
+    for var_data in variables:
+        if source in EXIT_POST_EXIT_SOURCES:
+            categorize_exit_like_variable(var_data, year, categorization, source)
+        else:
+            categorize_variable(var_data, year, categorization)
+        categorization.total_variables += 1
+
+
 def build_categorization_from_codebooks(
     codebooks: List[Dict[str, Any]],
 ) -> VariableCategorization:
@@ -372,19 +392,7 @@ def build_categorization_from_codebooks(
     """
     categorization = VariableCategorization()
     for codebook_data in codebooks:
-        year = codebook_data.get("year")
-        if year is None:
-            continue
-        source = codebook_data.get("source", "hrs_core_codebook")
-        categorization.years_covered.add(year)
-        categorization.total_years = len(categorization.years_covered)
-        variables = codebook_data.get("variables", [])
-        for var_data in variables:
-            if source in EXIT_POST_EXIT_SOURCES:
-                categorize_exit_like_variable(var_data, year, categorization, source)
-            else:
-                categorize_variable(var_data, year, categorization)
-            categorization.total_variables += 1
+        process_codebook_into_categorization(codebook_data, categorization)
     return categorization
 
 

@@ -17,7 +17,7 @@ from ...models import (
 from ....discovery.discover_codebooks import (
     VariableCategory,
     VariableCategorization,
-    build_categorization_from_codebooks,
+    process_codebook_into_categorization,
 )
 from ....models.cores import HRS_LEGACY_YEARS, HRS_MODERN_YEARS
 
@@ -65,12 +65,26 @@ def _categorization_to_response(c: VariableCategorization) -> CategorizationResp
     )
 
 
+# Project only fields needed for categorization to reduce memory (no value_codes, description, etc.)
+_CATEGORIZATION_PROJECTION = {
+    "year": 1,
+    "source": 1,
+    "variables.name": 1,
+    "variables.section": 1,
+    "variables.level": 1,
+    "variables.type": 1,
+    "variables.has_value_codes": 1,
+    "variables.is_identifier": 1,
+    "variables.is_derived": 1,
+}
+
+
 async def _fetch_categorization(
     year: Optional[int] = None,
     source: Optional[str] = None,
     core_period: Optional[str] = None,
 ) -> VariableCategorization:
-    """Fetch codebooks from MongoDB and build categorization. Raises 404 if no codebooks."""
+    """Fetch codebooks from MongoDB and build categorization. Streams one codebook at a time to limit memory."""
     client = get_mongodb_client()
     collection = client.get_collection("codebooks")
     query: Dict[str, Any] = {}
@@ -84,10 +98,15 @@ async def _fetch_categorization(
             query["year"] = {"$in": sorted(HRS_MODERN_YEARS)}
     if source:
         query["source"] = source
-    codebooks = list(collection.find(query, {"year": 1, "source": 1, "variables": 1}))
-    if not codebooks:
+    cursor = collection.find(query, _CATEGORIZATION_PROJECTION)
+    categorization = VariableCategorization()
+    count = 0
+    for codebook_doc in cursor:
+        process_codebook_into_categorization(codebook_doc, categorization)
+        count += 1
+    if count == 0:
         raise HTTPException(status_code=404, detail="No codebooks found for the given filters")
-    return build_categorization_from_codebooks(codebooks)
+    return categorization
 
 
 @router.get("", response_model=CategorizationResponse)
@@ -126,41 +145,41 @@ async def get_categorization_by_level(
     return ByLevelResponse(levels=_dict_categories(c.by_level))
 
 
-# @router.get("/types", response_model=ByTypeResponse)
-# async def get_categorization_by_type(
-#     year: Optional[int] = Query(None, description="Filter by year"),
-#     source: Optional[str] = Query(None, description="Filter by source"),
-#     core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
-# ):
-#     """Get variable categorization by variable type only."""
-#     c = await _fetch_categorization(year=year, source=source, core_period=core_period)
-#     return ByTypeResponse(types=_dict_categories(c.by_type))
+@router.get("/types", response_model=ByTypeResponse)
+async def get_categorization_by_type(
+    year: Optional[int] = Query(None, description="Filter by year"),
+    source: Optional[str] = Query(None, description="Filter by source"),
+    core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
+):
+    """Get variable categorization by variable type only."""
+    c = await _fetch_categorization(year=year, source=source, core_period=core_period)
+    return ByTypeResponse(types=_dict_categories(c.by_type))
 
 
-# @router.get("/base-names", response_model=ByBaseNameResponse)
-# async def get_categorization_by_base_name(
-#     year: Optional[int] = Query(None, description="Filter by year"),
-#     source: Optional[str] = Query(None, description="Filter by source"),
-#     core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
-# ):
-#     """Get variable categorization by base variable name only."""
-#     c = await _fetch_categorization(year=year, source=source, core_period=core_period)
-#     return ByBaseNameResponse(base_names=_dict_categories(c.by_base_name))
+@router.get("/base-names", response_model=ByBaseNameResponse)
+async def get_categorization_by_base_name(
+    year: Optional[int] = Query(None, description="Filter by year"),
+    source: Optional[str] = Query(None, description="Filter by source"),
+    core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
+):
+    """Get variable categorization by base variable name only."""
+    c = await _fetch_categorization(year=year, source=source, core_period=core_period)
+    return ByBaseNameResponse(base_names=_dict_categories(c.by_base_name))
 
 
-# @router.get("/special", response_model=SpecialCategoriesResponse)
-# async def get_categorization_special(
-#     year: Optional[int] = Query(None, description="Filter by year"),
-#     source: Optional[str] = Query(None, description="Filter by source"),
-#     core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
-# ):
-#     """Get special categories only (identifiers, derived, value-codes, prefix-based)."""
-#     c = await _fetch_categorization(year=year, source=source, core_period=core_period)
-#     return SpecialCategoriesResponse(
-#         identifiers=_category_to_response(c.identifiers),
-#         derived=_category_to_response(c.derived),
-#         with_value_codes=_category_to_response(c.with_value_codes),
-#         without_value_codes=_category_to_response(c.without_value_codes),
-#         year_prefixed=_category_to_response(c.year_prefixed),
-#         no_prefix=_category_to_response(c.no_prefix),
-#     )
+@router.get("/special", response_model=SpecialCategoriesResponse)
+async def get_categorization_special(
+    year: Optional[int] = Query(None, description="Filter by year"),
+    source: Optional[str] = Query(None, description="Filter by source"),
+    core_period: Optional[str] = Query(None, description="'legacy' or 'modern'"),
+):
+    """Get special categories only (identifiers, derived, value-codes, prefix-based)."""
+    c = await _fetch_categorization(year=year, source=source, core_period=core_period)
+    return SpecialCategoriesResponse(
+        identifiers=_category_to_response(c.identifiers),
+        derived=_category_to_response(c.derived),
+        with_value_codes=_category_to_response(c.with_value_codes),
+        without_value_codes=_category_to_response(c.without_value_codes),
+        year_prefixed=_category_to_response(c.year_prefixed),
+        no_prefix=_category_to_response(c.no_prefix),
+    )
