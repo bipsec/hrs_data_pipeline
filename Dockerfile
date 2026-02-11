@@ -3,13 +3,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install from pyproject.toml (no dev deps)
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
-
-# Application code
+# Copy package manifest and source so pip can build (hatchling needs src/ for metadata)
+COPY pyproject.toml README.md ./
 COPY src ./src
 COPY config ./config
+
+RUN pip install --no-cache-dir .
 
 # Render/Fly.io set PORT
 ENV PORT=8000

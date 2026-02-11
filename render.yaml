@@ -1,10 +1,11 @@
 # Render Blueprint – deploy from GitHub. Set MONGODB_CONNECTION_STRING (Atlas URI) in Dashboard.
+# Uses native Python build (no Docker); full repo is available at build time.
 services:
   - type: web
     name: hrs-data-pipeline
     runtime: python
     plan: free
-    buildCommand: pip install .
+    buildCommand: pip install --upgrade pip && pip install .
     startCommand: uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /years
     envVars:
