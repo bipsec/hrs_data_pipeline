@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from ..database.mongodb_client import get_global_mongo, close_global_mongo
+
 from .routes import (
     general_router,
     codebooks_router,
@@ -58,6 +60,16 @@ def main() -> None:
         port=8000,
         reload=True,
     )
+
+
+@app.on_event("startup")
+def _startup():
+    get_global_mongo()  # connect once
+
+@app.on_event("shutdown")
+def _shutdown():
+    close_global_mongo()
+
 
 
 if __name__ == "__main__":
