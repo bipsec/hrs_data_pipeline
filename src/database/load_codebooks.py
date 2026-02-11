@@ -194,6 +194,7 @@ def load_variables_index_to_mongodb(
 
 
 EXIT_SOURCE = "hrs_exit_codebook"
+POST_EXIT_SOURCE = "hrs_post_exit_codebook"
 
 
 def load_exit_codebooks(
@@ -232,6 +233,66 @@ def load_exit_codebooks(
             codebook_files.append((codebook_file, year, EXIT_SOURCE))
 
     print(f"Found {len(codebook_files)} exit codebook(s) to load\n")
+    for codebook_file, year, source in codebook_files:
+        try:
+            load_codebook_to_mongodb(
+                codebook_file,
+                mongodb_client,
+                year=year,
+                source=source,
+            )
+            index_file = codebook_file.parent / "variables_index.json"
+            if index_file.exists():
+                load_variables_index_to_mongodb(
+                    index_file,
+                    mongodb_client,
+                    year=year,
+                    source=source,
+                )
+            print()
+        except Exception as e:
+            print(f"  ERROR: Failed to load {codebook_file}: {e}")
+            import traceback
+            traceback.print_exc()
+    return len(codebook_files)
+
+
+def load_post_exit_codebooks(
+    parsed_dir: Path,
+    mongodb_client: MongoDBClient,
+    year_filter: Optional[int] = None,
+) -> int:
+    """Load post-exit codebooks from parsed directory into MongoDB.
+
+    Looks for parsed_dir / hrs_post_exit_codebook / {year} / codebook_{year}.json
+    and loads each into the codebooks collection with source=hrs_post_exit_codebook.
+    Also loads variables_index.json and section files when present.
+
+    Args:
+        parsed_dir: Directory containing parsed data (e.g. data/parsed)
+        mongodb_client: MongoDB client instance
+        year_filter: If set, load only this year
+
+    Returns:
+        Number of post-exit codebooks loaded.
+    """
+    post_exit_dir = parsed_dir / POST_EXIT_SOURCE
+    if not post_exit_dir.exists():
+        print(f"Post-exit codebook directory not found: {post_exit_dir}")
+        return 0
+
+    codebook_files: List[tuple] = []
+    for year_dir in post_exit_dir.iterdir():
+        if not year_dir.is_dir() or not year_dir.name.isdigit():
+            continue
+        y = int(year_dir.name)
+        if year_filter is not None and y != year_filter:
+            continue
+        codebook_file = year_dir / f"codebook_{y}.json"
+        if codebook_file.exists():
+            codebook_files.append((codebook_file, y, POST_EXIT_SOURCE))
+
+    print(f"Found {len(codebook_files)} post-exit codebook(s) to load\n")
     for codebook_file, year, source in codebook_files:
         try:
             load_codebook_to_mongodb(
@@ -397,6 +458,11 @@ def main():
         action="store_true",
         help="Load only exit codebooks (hrs_exit_codebook) from data/parsed/hrs_exit_codebook/",
     )
+    parser.add_argument(
+        "--post-exit-only",
+        action="store_true",
+        help="Load only post-exit codebooks (hrs_post_exit_codebook) from data/parsed/hrs_post_exit_codebook/",
+    )
 
     args = parser.parse_args()
 
@@ -418,6 +484,15 @@ def main():
             )
             print("=" * 60)
             print(f"Loaded {n} exit codebook(s)")
+            print(f"Database: {client.database_name}")
+        elif args.post_exit_only:
+            n = load_post_exit_codebooks(
+                args.parsed_dir,
+                client,
+                year_filter=args.year,
+            )
+            print("=" * 60)
+            print(f"Loaded {n} post-exit codebook(s)")
             print(f"Database: {client.database_name}")
         else:
             # Load codebooks (optionally filtered by --source and --year)
