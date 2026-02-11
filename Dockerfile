@@ -3,14 +3,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy package manifest and source so pip can build (hatchling needs src/ for metadata)
-COPY pyproject.toml README.md ./
+# Copy full package so pip can build (no editable install = no metadata-for-build-editable)
+COPY pyproject.toml ./
 COPY src ./src
 COPY config ./config
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 
-# Render/Fly.io set PORT
 ENV PORT=8000
 EXPOSE 8000
 
