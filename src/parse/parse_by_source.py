@@ -8,6 +8,7 @@ from src.models.cores import Codebook
 from src.models.exits import ExitCodebook
 
 from .parse_exit_codebook import parse_exit_codebook
+from .parse_post_exit_codebook import parse_post_exit_codebook
 from .parse_txt_codebook import parse_txt_codebook
 
 
@@ -44,9 +45,14 @@ def parse_codebook_for_source(
     pattern_group = (source.get("pattern_group") or "").lower()
 
     if name == "hrs_exit_codebook" or (
-        source_type == "html" and "exit" in pattern_group
+        source_type == "html" and "exit" in pattern_group and "post" not in pattern_group
     ):
         return parse_exit_codebook(file_path, source=name, year=year)
+
+    if name == "hrs_post_exit_codebook" or (
+        source_type == "html" and "post_exit" in pattern_group
+    ):
+        return parse_post_exit_codebook(file_path, source=name, year=year)
 
     if name == "hrs_core_codebook" or (
         source_type == "txt" or "core" in pattern_group
@@ -65,9 +71,7 @@ def get_parser_source_types() -> List[str]:
         name = s.get("name")
         if not name:
             continue
-        if name == "hrs_exit_codebook":
-            supported.append(name)
-        elif name == "hrs_core_codebook":
+        if name in ("hrs_exit_codebook", "hrs_core_codebook", "hrs_post_exit_codebook"):
             supported.append(name)
     return supported
 

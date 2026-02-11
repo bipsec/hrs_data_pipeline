@@ -10,7 +10,8 @@ from src.config_loader import get_years_for_source
 from .parse_txt_codebook import parse_txt_codebook
 from .parse_early_1992_1994 import parse_and_merge_early_codebook
 from .parse_exit_codebook import parse_exit_codebook, parse_and_merge_exit_codebook
-from .save_codebook import save_codebook_json, save_exit_codebook_json
+from .parse_post_exit_codebook import parse_post_exit_codebook, find_post_exit_codebook_files
+from .save_codebook import save_codebook_json, save_exit_codebook_json, save_cross_year_catalog
 from src.models.cores import (
     CrossYearVariableCatalog,
     VariableTemporalMapping,
@@ -272,7 +273,42 @@ def main():
                 traceback.print_exc()
         print("\n[OK] Exit codebook parsing complete.")
         return
-    
+
+    # Post-exit codebook: config years, files under data/HRS Data/{year}/Post Exit/
+    if args.source == "hrs_post_exit_codebook":
+        print(f"Searching for post-exit codebook files in: {args.data_dir}")
+        codebook_files = find_post_exit_codebook_files(args.data_dir, args.year)
+        if not codebook_files:
+            print(
+                "No post-exit codebook files found. Place .txt under "
+                "data/HRS Data/{year}/Post Exit/ (e.g. Post Exit/px98cb.txt or Post Exit/px98cb/px98cb.txt)"
+            )
+            sys.exit(1)
+        post_exit_by_year: dict = {}
+        for p in codebook_files:
+            y = _year_from_path(p)
+            if y is None:
+                for part in p.parts:
+                    if part.isdigit() and len(part) == 4 and 1990 <= int(part) <= 2030:
+                        y = int(part)
+                        break
+            if y is not None:
+                post_exit_by_year.setdefault(y, []).append(p)
+        for year, paths in sorted(post_exit_by_year.items()):
+            try:
+                # Use first file per year (post-exit typically one HTML per year)
+                path = paths[0]
+                print(f"\nParsing: {path}")
+                codebook = parse_post_exit_codebook(path, source=args.source, year=year)
+                out = save_exit_codebook_json(codebook, args.output_dir)
+                print(f"  Parsed {codebook.total_variables} variables in {codebook.total_sections} sections; saved to {out}")
+            except Exception as e:
+                print(f"  ERROR: {e}")
+                import traceback
+                traceback.print_exc()
+        print("\n[OK] Post-exit codebook parsing complete.")
+        return
+
     # Core codebook
     print(f"Searching for codebook files in: {args.data_dir}")
     codebook_files = find_codebook_files(args.data_dir, args.year)
