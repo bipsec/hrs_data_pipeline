@@ -4,10 +4,15 @@ import os
 import re
 import urllib.parse
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
+
+try:
+    import certifi
+except ImportError:
+    certifi = None  # type: ignore[assignment]
 
 
 def load_dotenv(dotenv_path: Path) -> Dict[str, str]:
@@ -109,8 +114,12 @@ class MongoDBClient:
     
     def connect(self) -> None:
         """Connect to MongoDB."""
+        # Use certifi CA bundle for Atlas (mongodb+srv) to avoid SSL handshake errors
+        kwargs: Dict[str, Any] = {}
+        if "mongodb+srv://" in self.connection_string and certifi is not None:
+            kwargs["tlsCAFile"] = certifi.where()
         try:
-            self.client = MongoClient(self.connection_string)
+            self.client = MongoClient(self.connection_string, **kwargs)
             # Test connection
             self.client.admin.command('ping')
             self.db = self.client[self.database_name]

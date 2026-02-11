@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "HRS Data Pipeline for discovering, fetching, and parsing codebooks"
 requires-python = ">=3.10"
 dependencies = [
+    "certifi>=2024.0.0",
     "httpx[http2]>=0.25.0",
     "pydantic>=2.0.0",
     "fastapi>=0.104.0",
