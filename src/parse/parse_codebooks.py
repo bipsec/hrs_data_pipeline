@@ -1,11 +1,13 @@
 """Main script for parsing HRS codebook files and saving to structured JSON."""
 
 import argparse
+from email.mime import base
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 from src.config_loader import get_years_for_source
+from src.parse import parse_ahead_codebooks, parse_core_imputations_codebooks, parse_exit_imputations_codebook
 
 from .parse_txt_codebook import parse_txt_codebook
 from .parse_early_1992_1994 import parse_and_merge_early_codebook
@@ -128,6 +130,84 @@ def find_exit_codebook_files(
                         codebooks.append(f)
     return sorted(set(codebooks))
 
+def find_imputations_codebook_files(data_dir: Path, year: Optional[int] = None, type: Optional[str] = "Core") -> List[Path]:
+    """Find imputations codebook files. Uses years from config/sources.yaml (hrs_core_imputations_codebook).
+
+    Looks under data_dir / 'HRS Data' / {year} / '(core)(exit)(postexit)_Imputations' / h*i/ for:
+    h*cb/h*cb.txt or h*cb.txt
+    """
+    prefix = "h"
+    match type:
+        case "Core":
+            prefix = "h"
+        case "Exit":
+            prefix = "x"
+
+
+    base = data_dir.resolve()
+    years = get_years_for_source(f"hrs_{type.lower()}_imputations_codebook")
+    if year is not None:
+        years = [y for y in years if y == year]
+    codebooks: List[Path] = []
+    for y in years:
+        yy = y % 100
+        #codebook could be under core_dir or cb_dir; it is a single txt file.
+        core_dir = base / "HRS Data" / str(y) / f"{type} Imputations" / f"{prefix}{y}i"
+        #h{yy}icb (e.g. h1996icb); 
+        cb_dir = core_dir / f"{prefix}{y}icb"
+        found: List[Path] = []
+        for cand_dir in (cb_dir, core_dir):
+            if not cand_dir.exists():
+                continue
+            combined_4 = cand_dir / f"{prefix}{y}icb.txt"
+            combined_2 = cand_dir / f"{prefix}{yy:02d}icb.txt"
+            if combined_4.exists():
+                found = [combined_4]
+                break
+            if combined_2.exists():
+                found = [combined_2]
+                break
+        if found:
+            codebooks.extend(found)
+    return sorted(set(codebooks))
+
+def find_ahead_codebook_files(data_dir: Path, year: Optional[int] = None, type: Optional[str] = "Core") -> List[Path]:
+    """Find AHEAD codebook files. Uses years from config/sources.yaml (ahead_()_codebook)"""
+    base = data_dir.resolve()
+    # fix so includes underscore
+    years = get_years_for_source(f"ahead_{type.lower().replace(' ', '_')}_codebook")
+    if year is not None:
+        years = [y for y in years if y == year]
+    codebooks: List[Path] = []
+    for y in years:
+        yy = y % 100
+        ahead_dir = base / "HRS Data" / str(y) / f"{type}"
+
+        # AHEAD has two years which are very different so the file paths are hard coded
+        if y == 1995:
+            cb = ahead_dir / f"a95core" / f"a95cb" / "a95cb.txt"
+            match type:
+                case "Core":
+                    cb = ahead_dir / "a95core" / "a95cb" / "a95cb.txt"
+                case "Exit":
+                    cb = ahead_dir / "x95exit" / "x95cb" / "x1995cb.txt"
+                case "Core Imputations":
+                    cb = ahead_dir / "a95i" / "a95icb.txt"
+                case "Exit Imputations":
+                    cb = ahead_dir / "x1995i" / "x95icb.txt"
+            if cb.exists():
+                codebooks.append(cb)
+            continue
+
+        #1993 has pdf codebook and just core data
+        if y == 1993 and type == "Core":
+            cb_dir = ahead_dir / "a93core" / "a93cb"
+            for f in cb_dir.iterdir():
+                if f.is_file() and f.name.startswith("CODB"):
+                    codebooks.append(f)
+            continue
+                
+    return sorted(set(codebooks))
 
 def _year_from_path(path: Path) -> Optional[int]:
     """Extract year from path like .../HRS Data/1992/Core/... or .../1994/..."""
@@ -273,6 +353,24 @@ def main():
         print("\n[OK] Exit codebook parsing complete.")
         return
     
+    # AHEAD codebooks:
+    if args.source.startswith("ahead"):
+        print(f"Searching for AHEAD codebook files in: {args.data_dir}")
+        parse_ahead_codebooks.main()
+        return
+    
+    # Imputation codebooks:
+    if args.source.endswith("imputations_codebook"):
+        if "core" in args.source:
+            parse_core_imputations_codebooks.main()
+            return
+        if "exit" in args.source:
+            parse_exit_imputations_codebook.main()
+            return
+        print(f"Unknown imputations codebook source: {args.source}. Expected 'hrs_core_imputations_codebook' or 'hrs_exit_imputations_codebook'.")
+        return 
+    
+
     # Core codebook
     print(f"Searching for codebook files in: {args.data_dir}")
     codebook_files = find_codebook_files(args.data_dir, args.year)

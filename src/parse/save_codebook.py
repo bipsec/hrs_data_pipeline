@@ -191,3 +191,18 @@ def save_cross_year_catalog(
         )
     
     return catalog_file
+
+def save_core_imputations_codebook_json(
+    codebook: Codebook,
+    output_dir: Path,
+    pretty: bool = True,
+) -> Path:
+    """Save a core imputations codebook to JSON (same layout as core: output_dir/source/year/)."""
+    return save_codebook_json(codebook, output_dir, pretty)
+
+def save_ahead_codebook_json(
+    codebook: Codebook,
+    output_dir: Path,
+    pretty: bool = True,) -> Path:
+    """Save an AHEAD codebook to JSON (same layout as core: output_dir/source/year/)."""
+    return save_codebook_json(codebook, output_dir, pretty)
