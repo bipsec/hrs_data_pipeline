@@ -21,7 +21,7 @@ from ....discovery.discover_codebooks import (
 )
 from ....models.cores import HRS_LEGACY_YEARS, HRS_MODERN_YEARS
 
-router = APIRouter(tags=["Categorization"], prefix="/categorization")
+router = APIRouter(tags=["Categorization"], prefix="/api/v1/hrs/categorization")
 
 
 def _category_to_response(cat: VariableCategory) -> VariableCategoryResponse:

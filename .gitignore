@@ -34,6 +34,7 @@ env/
 *~
 
 # Data
+data/HRS_Data
 data/raw/*
 data/parsed/*
 !data/raw/.gitkeep

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Path as PathParam
 from ...dependencies import get_mongodb_client
 from ...models import SectionResponse
 
-router = APIRouter(tags=["Sections"])
+router = APIRouter(prefix="/api/v1/hrs/core", tags=["Sections"])
 
 
 @router.get("/sections", response_model=List[SectionResponse])

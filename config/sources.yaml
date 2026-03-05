@@ -29,7 +29,7 @@ patterns:
   exit_codebook:
     - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/exit/codebook/h{sub_year}xpr_ri.htm"
     - "https://hrs.isr.umich.edu/sites/default/files/meta/{year}/exit/codebook/x{sub_year}pr_ri.htm"
-  
+
   exit_imputations_codebook:
     - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/x{sub_year}icb.txt"
     - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/h{year}xicb.txt"
@@ -52,22 +52,56 @@ patterns:
     - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/x95icb.txt"
   ahead_core_imputations_codebook:
     - "https://hrsdata.isr.umich.edu/sites/default/files/documentation/codebooks/a{year}icb.txt"
-  
 
 sources:
   - name: "hrs_core_codebook"
     type: "html"
     pattern_group: "core_codebook"
-    years: [1992, 1994, 1996, 1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    years:
+      [
+        1992,
+        1994,
+        1996,
+        1998,
+        2000,
+        2002,
+        2004,
+        2006,
+        2008,
+        2010,
+        2012,
+        2014,
+        2016,
+        2018,
+        2020,
+        2022,
+      ]
     starting_year: 1992
     ending_year: 2022
     sub_year: 92
     description: "Human Resources Survey (HRS) Core Codebook"
-  
+
   - name: "hrs_exit_codebook"
     type: "html"
     pattern_group: "exit_codebook"
-    years: [1995, 1996, 1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    years:
+      [
+        1995,
+        1996,
+        1998,
+        2000,
+        2002,
+        2004,
+        2006,
+        2008,
+        2010,
+        2012,
+        2014,
+        2016,
+        2018,
+        2020,
+        2022,
+      ]
     starting_year: 1995
     ending_year: 2022
     sub_year: 95
@@ -82,7 +116,6 @@ sources:
     sub_year: 96
     description: "Human Resources Survey (HRS) Exit Imputations Codebook"
 
-
   - name: "hrs_core_imputations_codebook"
     type: "txt"
     pattern_group: "core_imputations_codebook"
@@ -95,12 +128,27 @@ sources:
   - name: "hrs_post_exit_codebook"
     type: "html"
     pattern_group: "post_exit_codebook"
-    years: [1998, 2000, 2002, 2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022]
+    years:
+      [
+        1998,
+        2000,
+        2002,
+        2004,
+        2006,
+        2008,
+        2010,
+        2012,
+        2014,
+        2016,
+        2018,
+        2020,
+        2022,
+      ]
     starting_year: 1998
     ending_year: 2022
     sub_year: 98
     description: "Human Resources Survey (HRS) Post Exit codebook"
-  
+
   - name: "hrs_core_industry_occupations_codebook"
     type: "html"
     pattern_group: "core_industry_occupations_codebook"
@@ -109,6 +157,15 @@ sources:
     ending_year: 2010
     sub_year: 04
     description: "Human Resources Survey (HRS) Core Industry Occupations Codebook"
+
+  - name: "hrs_core_supplement_codebook"
+    type: "txt"
+    pattern_group: "core_supplement_codebook"
+    years: [2004, 2010]
+    starting_year: 2004
+    ending_year: 2010
+    sub_year: 04
+    description: "Human Resources Survey (HRS) Core Supplement Codebook"
 
   # ahead_data_section
   - name: "ahead_core_codebook"
@@ -119,7 +176,16 @@ sources:
     ending_year: 1995
     sub_year: 93
     description: "Human Resources Survey (HRS) Ahead Core Codebook"
-  
+
+  - name: "ahead_exit_codebook"
+    type: "html"
+    pattern_group: "ahead_exit_codebook"
+    years: [1995]
+    starting_year: 1995
+    ending_year: 1995
+    sub_year: 95
+    description: "Human Resources Survey (HRS) Ahead Exit Codebook"
+
   - name: "ahead_core_imputations_codebook"
     type: "txt"
     pattern_group: "ahead_core_imputations_codebook"

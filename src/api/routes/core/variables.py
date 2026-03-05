@@ -7,7 +7,7 @@ from ...dependencies import get_mongodb_client
 from ...models import VariableSummary, VariableDetail, VariableTemporalResponse
 from ....models.cores import get_year_prefix, construct_variable_name
 
-router = APIRouter(tags=["Variables"])
+router = APIRouter(prefix="/api/v1/hrs/core", tags=["Variables"])
 
 
 @router.get("/variables", response_model=List[VariableSummary])

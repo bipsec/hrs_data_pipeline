@@ -18,7 +18,7 @@ from ....models.cores import (
     get_year_from_wave,
 )
 
-router = APIRouter(tags=["General"])
+router = APIRouter(prefix="/api/v1/hrs", tags=["General"])
 
 # Static path: from api/routes/shared/general.py -> api/static
 static_path = Path(__file__).resolve().parent.parent.parent / "static"

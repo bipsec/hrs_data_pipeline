@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from src.config_loader import get_years_for_source
-from src.parse import parse_ahead_codebooks, parse_core_imputations_codebooks, parse_exit_imputations_codebook
+from src.parse import parse_ahead_codebooks, parse_core_imputations_codebooks, parse_exit_imputations_codebook, parse_core_supplement
 
 from .parse_txt_codebook import parse_txt_codebook
 from .parse_early_1992_1994 import parse_and_merge_early_codebook
@@ -209,6 +209,28 @@ def find_ahead_codebook_files(data_dir: Path, year: Optional[int] = None, type: 
                 
     return sorted(set(codebooks))
 
+
+def find_core_supplement_codebook_files(data_dir: Path, year: Optional[int] = None, source: Optional[str] = "hrs_core_supplement_codebook") -> List[Path]:
+    """Find core supplement codebook files. Uses years from config/sources.yaml (ahead_core_codebook)"""
+    base = data_dir.resolve()
+    years = get_years_for_source(source)
+    print(years)
+    if year is not None:
+        years = [y for y in years if y == year]
+    codebooks: List[Path] = []
+    for y in years:
+        yy = y % 100
+        if yy < 10: yy_str = f"0{yy}"
+        else: yy_str = str(yy)
+
+        base_dir = base / "HRS Data" / str(y) / "Core Supplement" / f"h{yy_str}indoccsupp"
+        
+        if base_dir.exists():
+            for f in base_dir.iterdir():
+                if f.is_file() and f.suffix.upper() == ".TXT":
+                    codebooks.append(f)
+    return sorted(set(codebooks))
+
 def _year_from_path(path: Path) -> Optional[int]:
     """Extract year from path like .../HRS Data/1992/Core/... or .../1994/..."""
     parts = path.parts
@@ -370,6 +392,10 @@ def main():
         print(f"Unknown imputations codebook source: {args.source}. Expected 'hrs_core_imputations_codebook' or 'hrs_exit_imputations_codebook'.")
         return 
     
+    # core supplement codebooks:
+    if args.source.endswith("hrs_core_supplement_codebook"):
+        parse_core_supplement.main()
+        return
 
     # Core codebook
     print(f"Searching for codebook files in: {args.data_dir}")

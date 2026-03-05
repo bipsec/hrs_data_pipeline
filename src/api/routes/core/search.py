@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 from ...dependencies import get_mongodb_client
 from ...models import VariableSummary, SearchResponse
 
-router = APIRouter(tags=["Search"])
+router = APIRouter(prefix="/api/v1/hrs/core", tags=["Search"])
 
 
 @router.get("/search", response_model=SearchResponse)

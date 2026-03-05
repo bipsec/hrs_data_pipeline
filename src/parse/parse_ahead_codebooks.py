@@ -19,7 +19,7 @@ from src.models.cores import (
     get_core_period,
     get_wave_number,
 )
-from src.parse.parse_codebooks import find_ahead_codebook_files
+
 from src.parse.parse_core_imputations_codebooks import _extract_release_type
 from src.parse.parse_exit_codebook import _extract_year_from_path
 from src.parse.parse_txt_codebook import _extract_year_from_filename, _is_identifier, _parse_level, _parse_level, _is_separator
@@ -337,6 +337,7 @@ def _extract_release_type(content: str) -> Optional[str]:
     return None
 
 def main() -> None:
+    from src.parse.parse_codebooks import find_ahead_codebook_files
     """CLI: parse core imputation codebooks and save to JSON."""
     import argparse
     import sys

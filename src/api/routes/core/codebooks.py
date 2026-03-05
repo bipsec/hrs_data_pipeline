@@ -12,7 +12,7 @@ from ....models.cores import (
     HRS_MODERN_YEARS,
 )
 
-router = APIRouter(tags=["Codebooks"])
+router = APIRouter(prefix="/api/v1/hrs/core", tags=["Codebooks"])
 
 
 @router.get("/codebooks", response_model=List[CodebookSummary])

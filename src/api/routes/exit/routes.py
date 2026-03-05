@@ -14,7 +14,7 @@ from ...models import (
     ExitSearchResponse,
 )
 
-router = APIRouter(prefix="/exit", tags=["Exit"])
+router = APIRouter(prefix="/api/v1/hrs/exit", tags=["Exit"])
 
 
 def _level_str(v: Any) -> str:

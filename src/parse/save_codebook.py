@@ -206,3 +206,11 @@ def save_ahead_codebook_json(
     pretty: bool = True,) -> Path:
     """Save an AHEAD codebook to JSON (same layout as core: output_dir/source/year/)."""
     return save_codebook_json(codebook, output_dir, pretty)
+
+def save_core_supplement_codebook_json(
+        codebook: Codebook,
+        output_dir: Path,
+        pretty: bool = True,
+) -> Path:
+    """Save a core supplement codebook to JSON (same layout as core: output_dir/source/year/)."""
+    return save_codebook_json(codebook, output_dir, pretty)

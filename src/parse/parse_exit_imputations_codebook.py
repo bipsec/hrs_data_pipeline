@@ -1,4 +1,3 @@
-from src.parse.parse_codebooks import find_imputations_codebook_files
 from src.parse.parse_core_imputations_codebooks import parse_core_imputations_txt_codebook
 from src.parse.parse_exit_codebook import _extract_year_from_path
 from pathlib import Path
@@ -10,6 +9,7 @@ def main() -> None:
     import argparse
     import sys
 
+    from src.parse.parse_codebooks import find_imputations_codebook_files
     from .save_codebook import save_core_imputations_codebook_json
 
     parser = argparse.ArgumentParser(description="Parse core imputation codebooks and save to JSON.")

@@ -14,6 +14,13 @@ from .routes import (
     utilities_router,
     categorizer_router,
     exit_router,
+    core_supplement_router,
+    core_imputations_router,
+    exit_imputations_router,
+    ahead_core_router,
+    ahead_exit_router,
+    ahead_core_imputations_router,
+    ahead_exit_imputations_router,
 )
 
 app = FastAPI(
@@ -45,7 +52,13 @@ app.include_router(search_router)
 app.include_router(utilities_router)
 app.include_router(categorizer_router)
 app.include_router(exit_router)
-
+app.include_router(core_supplement_router)
+app.include_router(core_imputations_router)
+app.include_router(exit_imputations_router)
+app.include_router(ahead_core_router)
+app.include_router(ahead_exit_router)
+app.include_router(ahead_core_imputations_router)
+app.include_router(ahead_exit_imputations_router)
 
 if __name__ == "__main__":
     import uvicorn
