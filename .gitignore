@@ -63,3 +63,5 @@ src/database/README.md
 src/database/example_usage.py
 src/fetch/client.py
 src/fetch/fetch_sources.py
+
+AWS/data/*
