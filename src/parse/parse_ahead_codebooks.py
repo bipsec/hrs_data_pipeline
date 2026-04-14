@@ -23,7 +23,9 @@ from src.models.cores import (
 from src.parse.parse_core_imputations_codebooks import _extract_release_type
 from src.parse.parse_exit_codebook import _extract_year_from_path
 from src.parse.parse_txt_codebook import _extract_year_from_filename, _is_identifier, _parse_level, _parse_level, _is_separator
-from src.parse.save_codebook import save_ahead_codebook_json
+from src.parse.save_codebook import save_ahead_codebook_json, save_ahead_1993_codebook_json
+    
+from src.parse.parse_ahead_1993 import main as parse_ahead_1993
 
 
 def parse_ahead_txt_codebook(
@@ -35,7 +37,7 @@ def parse_ahead_txt_codebook(
     
     Args:
         txt_path: Path to the TXT codebook file.
-        source: Sou_extract_release_type'hrs_core_imputations_codebook').
+        source: Source identifier for the codebook.
         year: Optional year; inferred from path if not set.
         
     Returns:
@@ -410,12 +412,16 @@ def main() -> None:
                 parent = parent.parent
         if y is not None:
             files_by_year.setdefault(y, []).append(p)
+    Html1993 = []
     for y, paths in sorted(files_by_year.items()):
         try:
             if len(paths) >= 1:
 
                 #havent handled 1993 yet - it has a pdf codebook and different format
                 if paths[0].suffix == ".pdf":
+                    continue
+                if y == 1993 and paths[0].suffix == ".html":
+                    Html1993.extend(paths)
                     continue
                 for p in paths:
                     print(f"Parsing {p}")
@@ -429,6 +435,11 @@ def main() -> None:
             print(f" ERROR: {e}", file=sys.stderr)
             traceback.print_exc()
             sys.exit(1)
+    if len(Html1993) > 0:
+        print(f"Parsing AHEAD 1993 codebook from HTML files: {Html1993}")
+        codebook = parse_ahead_1993(Html1993)
+        out = save_ahead_1993_codebook_json(codebook, args.output_dir, pretty=True)
+
     print("Done.")
 
 

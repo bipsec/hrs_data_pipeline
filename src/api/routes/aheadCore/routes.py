@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path as PathParam
 from typing import Any, Dict, List, Optional
+
+from src.api.models.responses import VariableDetail1993
 from ...dependencies import get_mongodb_client
 from ...models import CodebookSummary
 from ....models.cores import (
@@ -109,11 +111,18 @@ async def search_variables(
                     name_match = query_lower in var.get("name", "").lower()
                     desc_match = query_lower in var.get("description", "").lower()
                     if name_match or desc_match:
-                        results.append(VariableSummary(
-                            name=var.get("name", ""), year=codebook.get("year", 0),
-                            section=var.get("section", ""), level=var.get("level", ""),
-                            description=var.get("description", ""), type=var.get("type", ""),
-                        ))
+                        if var.year == 1993: #handle the special case of 1993 which has different format
+                            results.append(VariableSummary)(
+                                name=var.get("name", ""), year=codebook.get("year", 0),
+                                section=var.get("section", ""), levels=var.get("levels", []),
+                                description=var.get("description", ""),
+                            )
+                        else:
+                            results.append(VariableSummary(
+                                name=var.get("name", ""), year=codebook.get("year", 0),
+                                section=var.get("section", ""), level=var.get("level", ""),
+                                description=var.get("description", ""), type=var.get("type", ""),
+                            ))
             total = len(results)
             results = results[:limit]
             return SearchResponse(query=q, total=total, results=results, limit=limit)
@@ -126,11 +135,18 @@ async def search_variables(
             name_match = query_lower in var.get("name", "").lower()
             desc_match = query_lower in var.get("description", "").lower()
             if name_match or desc_match:
-                results.append(VariableSummary(
-                    name=var.get("name", ""), year=var.get("year", 0),
-                    section=var.get("section", ""), level=var.get("level", ""),
-                    description=var.get("description", ""), type=var.get("type", ""),
-                ))
+                if var.get("year") == 1993: #handle the special case of 1993 which has different format
+                    results.append(VariableSummary(
+                        name=var.get("name", ""), year=var.get("year", 0),
+                        section=var.get("section", ""), levels=var.get("levels", []),
+                        description=var.get("description", ""),
+                    ))
+                else:
+                    results.append(VariableSummary(
+                        name=var.get("name", ""), year=var.get("year", 0),
+                        section=var.get("section", ""), level=var.get("level", ""),
+                        description=var.get("description", ""), type=var.get("type", ""),
+                    ))
         total = len(results)
         results = results[:limit]
         return SearchResponse(query=q, total=total, results=results, limit=limit)
@@ -147,13 +163,19 @@ async def get_sections(
         if not codebook:
             raise HTTPException(status_code=404, detail=f"Codebook not found for year {year} and source {source}")
         sections = codebook.get("sections", [])
-        return [
-            SectionResponse(
-                code=sec["code"], name=sec["name"], level=sec["level"],
-                year=sec["year"], variable_count=sec["variable_count"], variables=sec["variables"],
-            )
-            for sec in sections
-        ]
+        secResponse = []
+        for sec in sections:
+            if sec["year"] == 1993: #handle the special case of 1993 which has different format
+                secResponse.append(SectionResponse(
+                    code=sec["code"], name=sec["name"], levels=sec.get("levels", []),
+                    year=sec["year"], variable_count=sec["variable_count"], variables=sec["variables"],
+                ))
+            else:
+                secResponse.append(SectionResponse(
+                    code=sec["code"], name=sec["name"], level=sec.get("level", ""),
+                    year=sec["year"], variable_count=sec["variable_count"], variables=sec["variables"],
+                ))
+        return secResponse
 
 
 @router.get("/sections/{section_code}", response_model=SectionResponse)
@@ -170,6 +192,11 @@ async def get_section(
         })
         if section_doc:
             section = section_doc.get("section", {})
+            if section.get("year") == 1993: #handle the special case of 1993 which has different format
+                return SectionResponse(
+                    code=section["code"], name=section["name"], levels=section.get("levels", []),
+                    year=section["year"], variable_count=section["variable_count"], variables=section["variables"],
+                )
             return SectionResponse(
                 code=section["code"], name=section["name"], level=section["level"],
                 year=section["year"], variable_count=section["variable_count"], variables=section["variables"],
@@ -182,6 +209,11 @@ async def get_section(
         section = next((s for s in sections if s["code"] == section_code), None)
         if not section:
             raise HTTPException(status_code=404, detail=f"Section '{section_code}' not found in {year} {source}")
+        if section.get("year") == 1993: #handle the special case of 1993 which has different format
+            return SectionResponse(
+                code=section["code"], name=section["name"], levels=section.get("levels", []),
+                year=section["year"], variable_count=section["variable_count"], variables=section["variables"],
+            )
         return SectionResponse(
             code=section["code"], name=section["name"], level=section["level"],
             year=section["year"], variable_count=section["variable_count"], variables=section["variables"],
@@ -210,22 +242,37 @@ async def get_variables(
         variables = codebook.get("variables", [])
         filtered_vars = []
         for var in variables:
+            if var.get("year") == 1993: #handle the special case of 1993 which has different format
+                if section and var.get("section") != section:
+                    continue
+                if level and level not in var.get("levels", []):
+                    continue
+                filtered_vars.append(var)
+                continue
             if section and var.get("section") != section:
                 continue
             if level and var.get("level") != level:
                 continue
             filtered_vars.append(var)
         filtered_vars = filtered_vars[:limit]
-        return [
-            VariableSummary(
-                name=var["name"], year=var["year"], section=var["section"],
-                level=var["level"], description=var["description"], type=var["type"],
-            )
-            for var in filtered_vars
-        ]
+        summaryList = []
+        for var in filtered_vars:
+            if var.get("year") == 1993: #handle the special case of 1993 which has different format
+                summaryList.append(VariableSummary(
+                    name=var.get("name", ""), year=var.get("year", 0),
+                    section=var.get("section", ""), levels=var.get("levels", []),
+                    description=var.get("description", ""),
+                ))
+            else:
+                summaryList.append(VariableSummary(
+                    name=var.get("name", ""), year=var.get("year", 0),
+                    section=var.get("section", ""), level=var.get("level", ""),
+                    description=var.get("description", ""), type=var.get("type", ""),
+                ))
+        return summaryList
 
 
-@router.get("/variables/{variable_name}", response_model=VariableDetail)
+@router.get("/variables/{variable_name}", response_model=VariableDetail|VariableDetail1993)
 async def get_variable(
     variable_name: str = PathParam(..., description="Variable name"),
     year: int = Query(..., description="Year of the codebook"),
@@ -241,6 +288,8 @@ async def get_variable(
         variable = next((v for v in variables if v["name"] == variable_name), None)
         if not variable:
             raise HTTPException(status_code=404, detail=f"Variable '{variable_name}' not found in {year} {source}")
+        if variable.get("year") == 1993: #handle the special case of 1993 which has different format
+            return VariableDetail1993(**variable)
         return VariableDetail(**variable)
 
 

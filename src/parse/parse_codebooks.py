@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from src.config_loader import get_years_for_source
-from src.parse import parse_ahead_codebooks, parse_core_imputations_codebooks, parse_exit_imputations_codebook, parse_core_supplement
+from src.parse import parse_ahead_codebooks, parse_core_imputations_codebooks, parse_exit_imputations_codebook, parse_core_supplement, parse_ahead_1993
 
 from .parse_txt_codebook import parse_txt_codebook
 from .parse_early_1992_1994 import parse_and_merge_early_codebook
@@ -201,9 +201,9 @@ def find_ahead_codebook_files(data_dir: Path, year: Optional[int] = None, type: 
 
         #1993 has pdf codebook and just core data
         if y == 1993 and type == "Core":
-            cb_dir = ahead_dir / "a93core" / "a93cb"
+            cb_dir = ahead_dir / "a93core"
             for f in cb_dir.iterdir():
-                if f.is_file() and f.name.startswith("CODB"):
+                if f.is_file() and f.suffix.lower()== ".html":
                     codebooks.append(f)
             continue
                 
@@ -306,6 +306,7 @@ def build_cross_year_catalog(codebooks: List[dict]) -> CrossYearVariableCatalog:
             mapping.year_gaps = gaps
     
     return catalog
+
 
 
 def main():

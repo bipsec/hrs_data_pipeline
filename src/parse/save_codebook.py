@@ -6,6 +6,7 @@ from typing import Optional, Union
 
 from src.models.cores import Codebook, CrossYearVariableCatalog, VariableTemporalMapping
 from src.models.exits import ExitCodebook
+from src.models.ahead1993 import Ahead1993Codebook, Ahead1993Variable, Ahead1993ValueCode, VariableLevel
 
 
 def save_codebook_json(
@@ -214,3 +215,72 @@ def save_core_supplement_codebook_json(
 ) -> Path:
     """Save a core supplement codebook to JSON (same layout as core: output_dir/source/year/)."""
     return save_codebook_json(codebook, output_dir, pretty)
+
+def save_ahead_1993_codebook_json(
+        codebook: Ahead1993Codebook,
+        output_dir: Path,
+        pretty: bool = True,
+) -> Path:
+    """Save the AHEAD 1993 codebook to JSON (different layout from core codebooks)."""
+     # Create directory structure: output_dir/source/year/
+    output_path = output_dir / codebook.source / str(codebook.year)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Save main codebook file
+    codebook_file = output_path / f"codebook_{codebook.year}.json"
+    with open(codebook_file, "w", encoding="utf-8") as f:
+        json.dump(
+            codebook.model_dump(mode="json"),
+            f,
+            indent=2 if pretty else None,
+            ensure_ascii=False,
+            default=str,  # Handle datetime and enum serialization
+        )
+    
+    # Save variables by section
+    sections_dir = output_path / "sections"
+    sections_dir.mkdir(exist_ok=True)
+    
+    for section in codebook.sections:
+        section_vars = [v for v in codebook.variables if v.section == section.code]
+        section_data = {
+            "section": section.model_dump(mode="json"),
+            "variables": [v.model_dump(mode="json") for v in section_vars],
+        }
+        
+        section_file = sections_dir / f"section_{section.code}.json"
+        with open(section_file, "w", encoding="utf-8") as f:
+            json.dump(
+                section_data,
+                f,
+                indent=2 if pretty else None,
+                ensure_ascii=False,
+                default=str,
+            )
+    
+    # Save variables index (quick lookup)
+    variables_index = {
+        "year": codebook.year,
+        "source": codebook.source,
+        "total_variables": codebook.total_variables,
+        "variables": [
+            {
+                "name": v.name,
+                "section": v.section,
+                "levels": v.levels,
+                "description": v.description,
+            }
+            for v in codebook.variables
+        ],
+    }
+    
+    index_file = output_path / "variables_index.json"
+    with open(index_file, "w", encoding="utf-8") as f:
+        json.dump(
+            variables_index,
+            f,
+            indent=2 if pretty else None,
+            ensure_ascii=False,
+        )
+    
+    return codebook_file

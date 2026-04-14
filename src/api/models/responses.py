@@ -1,7 +1,9 @@
 """API response/summary models for HRS pipeline."""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+
+from src.models.ahead1993 import Ahead1993Variable
 
 from ...models.cores import (
     Variable,
@@ -17,21 +19,26 @@ class VariableSummary(BaseModel):
     name: str
     year: int
     section: str
-    level: str
+    level: Optional[str] = None
+    levels: Optional[List[str]] = None #handle multiple levels for 1993 variables
     description: str
-    type: str
+    type: Optional[str] = None
 
 
 class VariableDetail(Variable):
     """Full variable details (extends core Variable)."""
     pass
 
+class VariableDetail1993(Ahead1993Variable):
+    """Full variable details for 1993 variables (extends Ahead1993Variable)."""
+    pass
 
 class SectionResponse(BaseModel):
     """Section response model."""
     code: str
     name: str
-    level: str
+    level: Optional[str] = None
+    levels: Optional[List[str]] = None
     year: int
     variable_count: int
     variables: List[str]
