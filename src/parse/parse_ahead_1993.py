@@ -51,7 +51,6 @@ def frequencyCount(lines: list[str], vname = "xxxxxx") -> int:
     return fCount
 
 def combinedVariable(text: str, remVars: List[Ahead1993Variable], variableName: str, description: str, levels: List[str], sectionCode: str) -> List[Ahead1993Variable]:
-    print("Combined" + variableName)
     variables: List[Ahead1993Variable] = []
     dashMatch = re.search(r'-{8,}(.*)', text, re.DOTALL)
     if dashMatch:
@@ -68,7 +67,6 @@ def combinedVariable(text: str, remVars: List[Ahead1993Variable], variableName: 
             for v in line:
                 for r in remVars:
                     if r.name in v:
-                        print("works")
                         remVars.remove(r)
                         combineVars.append(r)
                         break
@@ -96,7 +94,6 @@ def combinedVariable(text: str, remVars: List[Ahead1993Variable], variableName: 
             valueCodePart = valueLine[fCount]
             
             if "..." in valueCodePart:
-                print(frequencies)
                 codeMatch = re.search(r'([0-9A-Z\s]+)\.{3,}\s*([A-Z\.0-9]+)', valueCodePart)
                 if codeMatch:
                     fDict = {}
@@ -127,10 +124,12 @@ def combinedVariable(text: str, remVars: List[Ahead1993Variable], variableName: 
                         is_range=False
                     )
                     valueCodes.append(valueCode)
-                    i += 1
                     break
             valueCodePart = valueCodePart.split(maxsplit=1)
-            print(valueCodePart)
+            invalidMatch = re.match(r'^(?![0-9]{1,7}|\.D|\.R)', valueCodePart[0])
+            if invalidMatch:
+                i += 1
+                continue
             code = valueCodePart[0]
             label = valueCodePart[1] if len(valueCodePart) > 1 else ""
             fDict = {combineVars[j].name: f for j, f in enumerate(frequencies[:-1])}
@@ -147,7 +146,6 @@ def combinedVariable(text: str, remVars: List[Ahead1993Variable], variableName: 
         for v in combineVars:
             newCodes: List[Ahead1993ValueCode] = [] # get codes that correspond to variable
             for vcode in valueCodes:
-                print(vcode)
                 vname = v.name
                 ncode = Ahead1993ValueCode(
                     code=vcode.code,
@@ -312,6 +310,7 @@ def rangeVariable(text: str, variableName: str, description: str, levels: List[s
             else:
                 i += 1
                 continue
+            
             valueCode = Ahead1993ValueCode(
                 code = valCode,
                 label = valueCodeName.split(".", maxsplit=1)[0].strip(),
@@ -321,8 +320,6 @@ def rangeVariable(text: str, variableName: str, description: str, levels: List[s
             )
             valueCodes.append(valueCode)
             i += 1
-    for v in valueCodes:
-        print(v.frequency)
     if len(valueCodes) == 0:
         return variables
     rangeVars = [
@@ -348,7 +345,6 @@ def basicVariable(text: str, lines: List[str], variableName: str, description: s
     valueCodes: List[Ahead1993ValueCode] = []
     dashMatch = re.search(r'-{8,}(.*)', text, re.DOTALL)
     if dashMatch:
-        print(variableName)
         text = dashMatch.group(1)
     lev = levels
     #look for line with levels for frequency columns
@@ -372,7 +368,6 @@ def basicVariable(text: str, lines: List[str], variableName: str, description: s
             i = 2
         while i < len(fixLines):
             line = fixLines[i].strip()
-            print(line)
             if line == "":
                 i += 1
                 continue 
@@ -419,6 +414,10 @@ def basicVariable(text: str, lines: List[str], variableName: str, description: s
                 codePart = code[fCount].split(maxsplit=1)
                 code = codePart[0]
                 label = codePart[1] if len(codePart) > 1 else ""
+                invalidMatch = re.match(r'^(?![0-9]{1,7}|\.D|\.R)', code)
+                if invalidMatch:
+                    i += 1
+                    continue
                 valueCode = Ahead1993ValueCode(
                     code = code,
                     label = label,
@@ -522,7 +521,7 @@ def parseHTML(soup: BeautifulSoup, sectionCode:str):
     remVars: List[Ahead1993Variable] = [] #if var data is stored with a later variable
     for k in soup.find_all("a", attrs={"name": re.compile(r'[A-Z0-9\-]')}):
         variableName = k.attrs["name"]
-        print(sectionCode + " " + variableName)
+        
         text = k.get_text()
         subText = k.findChildren("b")
         if len(subText) > 0:
@@ -570,7 +569,6 @@ def parseHTML(soup: BeautifulSoup, sectionCode:str):
             remVars = []
             lines = [l.strip() for l in lines if l.strip() != ""] # remove blank lines
             if len(lines) < 1:
-                print("no Lines " + variableName)
                 variable = Ahead1993Variable(
                     name=variableName,
                     description=description,
@@ -627,7 +625,6 @@ def parseHTML(soup: BeautifulSoup, sectionCode:str):
 
         #combined variable data
         if len(remVars) > 0:
-            print(remVars)
             vars = combinedVariable(text, remVars, variableName, description, levels, sectionCode)
             if len(vars) > 0:
                 variables.extend(vars)
@@ -645,7 +642,6 @@ def parseHTML(soup: BeautifulSoup, sectionCode:str):
         if "-" in variableName:
             vars = rangeVariable(text, variableName, description, levels, sectionCode)
             if len(vars) > 0:
-                print(vars)
                 variables.extend(vars)
                 continue
             else:
@@ -707,11 +703,18 @@ def main(codebooks: List[Path] = []):
         if a.suffix != ".html":
             continue
         with open(a, "r") as f:
+            
             lines = f.readlines()
             sectionCode = "Z"
             sectionName = "Default"
+            #relies on html file name kept the same. Not really a nice way to do it other wise
+            bookName = a.name
+            match = re.search(r'codb\-mod', bookName)
+            if match:
+                sectionCode = 'MOD'
+                sectionName = 'ADDITIONAL MODULES'
             for line in lines:
-                sectionMatch = re.search(r'SECTION\s+(\S){1,3}\.(.*)', line.strip())
+                sectionMatch = re.search(r'SECTION\s+(\S){1,3}\.\s*([A-Z\s]*[A-Z]+)', line.strip())
                 if sectionMatch:
                     sectionCode = sectionMatch.group(1)
                     sectionName = sectionMatch.group(2).strip()
@@ -721,7 +724,6 @@ def main(codebooks: List[Path] = []):
             soup = BeautifulSoup(f.read(), 'html.parser')
 
             vars = parseHTML(soup, sectionCode)
-            print(vars[0:3])
             levSet:Set = set()
             for v in vars:
                 levSet.update(v.levels)
